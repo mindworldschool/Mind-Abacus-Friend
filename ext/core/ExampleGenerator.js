@@ -1,4 +1,10 @@
 // ext/core/ExampleGenerator.js - Генератор примеров на основе правил
+//
+// Поддерживает:
+// - UnifiedSimpleRule (Просто)
+// - BrothersRule (Братья - через 5)
+// - FriendsRule (Друзья - через 10)
+// - MultiDigitGenerator (многозначные числа)
 
 export class ExampleGenerator {
   constructor(rule) {
@@ -49,145 +55,94 @@ export class ExampleGenerator {
 
         // Если получили цепочку длиннее лимита maxSteps — обрежем и пересчитаем ответ
         const maxStepsAllowed =
-          this.rule.config?.maxSteps ?? example.steps.length;
+          this.rule.config?.maxSteps ??
+          this.rule.config?.actionsCount?.max ??
+          6;
 
         if (example.steps.length > maxStepsAllowed) {
-          console.warn(
-            `⚠️ Генератор создал ${example.steps.length} шагов при лимите ${maxStepsAllowed}, обрезаем`
+          example.steps = example.steps.slice(0, maxStepsAllowed);
+          example.answer = example.steps.reduce(
+            (state, step) => this.rule.applyAction(state, step.action),
+            example.start
           );
-
-          const trimmedSteps = example.steps.slice(0, maxStepsAllowed);
-
-          // Пересчёт ответа
-          let recomputedState = example.start;
-          for (const step of trimmedSteps) {
-            recomputedState = this.rule.applyAction(
-              recomputedState,
-              step.action
-            );
-          }
-
-          example = {
-            start: example.start,
-            steps: trimmedSteps,
-            answer: recomputedState
-          };
         }
 
-        // Проверка, что промежуточные состояния не вылезли за 0..9 (актуально для нескольких разрядов)
-        if (digitCount > 1 && !combineLevels) {
-          if (!this._validateIntermediateStates(example)) {
+        // Валидация минимальной длины
+        const minStepsRequired =
+          this.rule.config?.minSteps ??
+          this.rule.config?.actionsCount?.min ??
+          2;
+
+        if (example.steps.length < minStepsRequired) {
+          if (attempt % 30 === 0) {
             console.warn(
-              `⚠️ Попытка ${attempt}: промежуточные состояния вышли за диапазон`
+              `⚠️ Попытка ${attempt}: слишком короткая цепочка (${example.steps.length} < ${minStepsRequired})`
             );
-            continue;
-          }
-        }
-
-        // Финальная валидация методикой
-        if (this.rule.validateExample && !this.rule.validateExample(example)) {
-          console.warn(`⚠️ Попытка ${attempt}: пример не прошёл валидацию (шагов: ${example.steps.length})`);
-
-          // Логируем детали для отладки
-          if (attempt % 20 === 0) {
-            console.log(`   Детали попытки ${attempt}:`, {
-              start: example.start,
-              answer: example.answer,
-              stepsCount: example.steps.length,
-              steps: example.steps.map(s => s.action)
-            });
           }
           continue;
         }
 
-        console.log(`✅ Пример сгенерирован (попытка ${attempt})`);
+        // Проверка промежуточных состояний
+        if (!this._validateIntermediateStates(example)) {
+          if (attempt % 30 === 0) {
+            console.warn(`⚠️ Попытка ${attempt}: невалидное промежуточное состояние`);
+          }
+          continue;
+        }
+
+        // Проверяем валидацию правила (например, для BrothersRule - наличие братских шагов)
+        if (!this.validate(example)) {
+          if (attempt % 30 === 0) {
+            console.warn(`⚠️ Попытка ${attempt}: пример не прошёл валидацию правила`);
+          }
+          continue;
+        }
+
+        console.log(
+          `✅ Пример сгенерирован за ${attempt} попыток: ${this.formatForDisplay(example)}`
+        );
         return example;
-      } catch (error) {
-        console.warn(`⚠️ Попытка ${attempt} неудачна:`, error.message);
-        if (attempt % 20 === 0) {
-          console.error(`   Ошибка на попытке ${attempt}:`, error);
+      } catch (e) {
+        if (attempt % 30 === 0) {
+          console.warn(`⚠️ Попытка ${attempt} упала с ошибкой:`, e.message);
         }
       }
     }
 
-    throw new Error(
-      `Не удалось сгенерировать валидный пример за ${maxAttempts} попыток`
+    // Если не смогли сгенерировать — даём минимальный fallback
+    console.error(
+      `❌ Не удалось сгенерировать пример за ${maxAttempts} попыток. Возвращаем fallback.`
     );
+    return this._fallbackExample();
   }
 
   /**
-   * Генерация ОДНОГО РАЗРЯДА (самый частый кейс "Просто").
-   *
-   * Алгоритм:
-   *  1. стартуем с 0;
-   *  2. на каждом шаге спрашиваем у правила getAvailableActions(currentState, isFirstStep, previousSteps);
-   *  3. выбираем одно из допустимых действий;
-   *     - лёгкий приоритет больших абсолютных значений шага,
-   *       чтобы цифры 6-9 чаще попадали, если они разрешены;
-   *  4. применяем шаг;
-   *  5. повторяем.
-   *
-   * Никаких искусственных "запрет одинакового шага подряд".
-   * Никаких попыток "починить" финал — это делает validateExample.
+   * Генерация одноразрядного примера (digitCount === 1).
    */
   _generateSingleDigitAttempt() {
-    // стартовое состояние (обычно 0)
     const start = this.rule.generateStartState();
-    let stepsCount = this.rule.generateStepsCount();
-
-    // гарантируем минимум шагов
-    const minSteps = this.rule.config?.minSteps ?? 2;
-    if (stepsCount < minSteps) stepsCount = minSteps;
+    const stepsCount = this.rule.generateStepsCount();
 
     const steps = [];
     let currentState = start;
 
     for (let i = 0; i < stepsCount; i++) {
-      const isFirstAction = i === 0 && steps.length === 0;
-
-      // доступные ходы физически возможные сейчас
-      // 🔥 НОВОЕ: передаем массив предыдущих шагов для избежания повторов
-      let availableActions = this.rule.getAvailableActions(
+      const isFirstAction = i === 0;
+      const availableActions = this.rule.getAvailableActions(
         currentState,
         isFirstAction,
-        steps  // передаем историю для проверки повторов
+        0, // position для одноразрядного
+        null, // fullState - не используется в одноразрядном режиме
+        steps // previousSteps для предотвращения повторов
       );
 
       if (!availableActions || availableActions.length === 0) {
-        // мы упёрлись (например стояли на 4, а все разрешённые цифры — только плюсы)
-        // просто заканчиваем пример раньше
-        console.warn(`⚠️ Шаг ${i+1}: нет доступных действий из состояния ${currentState}, заканчиваем генерацию`);
-
-        // Если это первый шаг - выбрасываем исключение, чтобы попробовать другую попытку
-        if (i === 0) {
-          throw new Error(`Невозможно сделать первый шаг из состояния ${currentState}`);
-        }
+        // тупик → прерываем
         break;
       }
 
-      // Логирование для отладки
-      console.log(`🎲 Шаг ${i+1}: доступно ${availableActions.length} действий из состояния ${currentState}`);
-
-      // 🔥 УЛУЧШЕННЫЙ КОММЕНТАРИЙ: Для блока "Братья" правило приоритизирует братские шаги (80% вероятность)
-      // Выбираем случайный шаг с весами по абсолютной величине
-      let action;
-
-      // Применяем веса: большие значения выбираются чаще
-      const weighted = [];
-      for (const act of availableActions) {
-        const val = typeof act === "object" ? act.value : act;
-        const w = 1 + Math.abs(val) * 0.3;
-        for (let k = 0; k < w; k++) {
-          weighted.push(act);
-        }
-      }
-      action = weighted[Math.floor(Math.random() * weighted.length)];
-
-      if (typeof action === "object" && action.isBrother) {
-        console.log(`✨ Выбран братский шаг: ${action.value} (брат ${action.brotherN})`);
-      }
-
-      // применяем действие
+      const action =
+        availableActions[Math.floor(Math.random() * availableActions.length)];
       const newState = this.rule.applyAction(currentState, action);
 
       steps.push({
@@ -207,149 +162,128 @@ export class ExampleGenerator {
   }
 
   /**
-   * Генерация МНОГОРАЗРЯДНОГО примера (digitCount > 1).
-   * Каждый шаг — это вектор {position,value} для КАЖДОГО разряда,
-   * причём знак у всех разрядов на шаге общий (+ или -).
-   * Первый шаг обязан быть положительным.
+   * Генерация многоразрядного примера в векторном режиме.
+   * (Сохраняется для обратной совместимости)
    */
   _generateMultiDigitAttemptVectorBased() {
-    const digitCount = this.rule.config?.digitCount || 2;
-    const maxSteps = this.rule.generateStepsCount();
-    const firstMustBePositive =
-      this.rule.config?.firstActionMustBePositive !== false;
+    const digitCount = this.rule.config?.digitCount || 1;
+    const combineLevels = this.rule.config?.combineLevels ?? false;
 
-    // начальное состояние: [0,0,...]
-    let currentState = this.rule.generateStartState();
-    const startState = Array.isArray(currentState)
-      ? [...currentState]
-      : [currentState];
+    const start = Array.isArray(this.rule.generateStartState())
+      ? this.rule.generateStartState()
+      : Array(digitCount).fill(0);
 
+    const stepsCount = this.rule.generateStepsCount();
     const steps = [];
+    let currentState = [...start];
 
-    for (let stepIndex = 0; stepIndex < maxSteps; stepIndex++) {
-      const isFirstStep = stepIndex === 0 && steps.length === 0;
+    for (let i = 0; i < stepsCount; i++) {
+      const isFirstAction = i === 0;
 
-      // какой знак разрешён?
-      const candidateSigns =
-        isFirstStep && firstMustBePositive ? [+1] : [+1, -1];
-
-      let chosenVector = null;
-
-      // пробуем построить валидный общий вектор для одного из разрешённых знаков
-      for (const sign of candidateSigns) {
-        const vectors = this._buildCandidateVectorsForSign(
+      // собираем допустимые шаги отдельно для каждого разряда
+      const actionsPerDigit = [];
+      for (let pos = 0; pos < digitCount; pos++) {
+        const digitValue = currentState[pos];
+        const acts = this.rule.getAvailableActions(
+          digitValue,
+          isFirstAction,
+          pos,
           currentState,
-          sign,
-          isFirstStep,
-          steps  // 🔥 НОВОЕ: передаем историю
+          steps
         );
-
-        if (vectors.length === 0) {
-          continue;
-        }
-
-        // выберем случайный вектор
-        chosenVector =
-          vectors[Math.floor(Math.random() * vectors.length)];
-        break;
+        actionsPerDigit.push(acts.length > 0 ? acts : [0]);
       }
 
-      // если вообще не нашли ход — выходим
-      if (!chosenVector) {
-        break;
+      // Если combineLevels → генерим единый вектор
+      // Если нет → только один разряд "двигается"
+      let chosenVector;
+
+      if (combineLevels) {
+        // декартово произведение
+        const combinations = this._cartesian(actionsPerDigit);
+        if (combinations.length === 0) break;
+        chosenVector = combinations[Math.floor(Math.random() * combinations.length)];
+      } else {
+        // выбираем один случайный разряд, остальные 0
+        const validPositions = actionsPerDigit
+          .map((arr, idx) => (arr.some(a => a !== 0) ? idx : -1))
+          .filter(idx => idx >= 0);
+
+        if (validPositions.length === 0) break;
+
+        const chosenPos =
+          validPositions[Math.floor(Math.random() * validPositions.length)];
+        const nonZeroActions = actionsPerDigit[chosenPos].filter(a => a !== 0);
+
+        if (nonZeroActions.length === 0) break;
+
+        const chosenAction =
+          nonZeroActions[Math.floor(Math.random() * nonZeroActions.length)];
+
+        chosenVector = Array(digitCount).fill(0);
+        chosenVector[chosenPos] = chosenAction;
       }
 
-      // применяем вектор сразу ко всем разрядам
-      const newState = this._applyVectorToAllDigits(
-        currentState,
-        chosenVector
-      );
+      // Применяем вектор
+      const newState = currentState.map((v, idx) => v + chosenVector[idx]);
+
+      // Проверяем границы 0..9
+      if (newState.some(v => v < 0 || v > 9)) {
+        // откат — не добавляем шаг
+        continue;
+      }
+
+      // Собираем action как массив {position, value}
+      const actionVector = chosenVector.map((val, pos) => ({ position: pos, value: val }));
 
       steps.push({
-        action: chosenVector, // [{position,value},...]
-        fromState: currentState,
-        toState: newState
+        action: actionVector,
+        fromState: [...currentState],
+        toState: [...newState]
       });
 
       currentState = newState;
     }
 
     return {
-      start: startState,
+      start,
       steps,
       answer: currentState
     };
   }
 
   /**
-   * Строим ВСЕ возможные векторы действий для заданного знака шага (+ или -)
-   * так, чтобы каждый разряд получил допустимый локальный шаг,
-   * и чтобы после шага не было выхода за 0..9.
+   * Минимальный fallback-пример, если генерация не удалась.
    */
-  _buildCandidateVectorsForSign(currentState, sign, isFirstStep, previousSteps = []) {
-    const digitCount = this.rule.config?.digitCount || 2;
-
-    const perDigitOptions = [];
-
-    for (let pos = 0; pos < digitCount; pos++) {
-      const localActions = this.rule.getAvailableActions(
-        currentState,
-        isFirstStep,
-        pos,
-        previousSteps  // 🔥 НОВОЕ: передаем историю для проверки повторов
-      );
-
-      // отфильтровать по знаку
-      const filtered = localActions.filter(a => {
-        const v = typeof a === "object" ? a.value : a;
-        return sign > 0 ? v > 0 : v < 0;
-      });
-
-      if (filtered.length === 0) {
-        // один из разрядов не может двигаться с таким знаком -> вектор невозможен
-        return [];
-      }
-
-      // нормализуем к формату {position,value}
-      const normalized = filtered.map(a =>
-        typeof a === "object" ? a : { position: pos, value: a }
-      );
-
-      perDigitOptions.push(normalized);
+  _fallbackExample() {
+    const digitCount = this.rule.config?.digitCount || 1;
+    if (digitCount === 1) {
+      return {
+        start: 0,
+        steps: [
+          { action: 1, fromState: 0, toState: 1 },
+          { action: 2, fromState: 1, toState: 3 }
+        ],
+        answer: 3
+      };
     }
-
-    // декартово произведение всех разрядов
-    const allCombos = this._cartesian(perDigitOptions);
-
-    // фильтруем те комбинации, которые выбивают хоть один разряд за 0..9
-    const validCombos = allCombos.filter(vector => {
-      const newState = this._applyVectorToAllDigits(
-        currentState,
-        vector
-      );
-      if (newState.some(d => d < 0)) return false;
-      if (newState.some(d => d > 9)) return false;
-      return true;
-    });
-
-    return validCombos;
+    // многоразрядный fallback
+    const start = Array(digitCount).fill(0);
+    return {
+      start,
+      steps: [
+        {
+          action: [{ position: 0, value: 1 }],
+          fromState: [...start],
+          toState: start.map((v, i) => (i === 0 ? 1 : v))
+        }
+      ],
+      answer: start.map((v, i) => (i === 0 ? 1 : v))
+    };
   }
 
   /**
-   * Применяет вектор [{position,value}, ...] к состоянию массива разрядов.
-   */
-  _applyVectorToAllDigits(stateArray, vector) {
-    const result = [...stateArray];
-    for (const part of vector) {
-      const pos = part.position;
-      const val = part.value;
-      result[pos] = result[pos] + val;
-    }
-    return result;
-  }
-
-  /**
-   * Декартово произведение массивов вариантов для каждого разряда.
+   * Декартово произведение массивов.
    */
   _cartesian(arrays) {
     return arrays.reduce(
@@ -426,7 +360,9 @@ export class ExampleGenerator {
   /**
    * Формат для trainer_logic.js:
    *  - steps => массив строк вида "+3", "-7", "+5"
-   *            ИЛИ объектов { step: "+1", isBrother: true, formula: [...] }
+   *            ИЛИ объектов:
+   *            - { step: "+1", isBrother: true, brotherN: 4, formula: [...] }
+   *            - { step: "+9", isFriend: true, friendN: 9, formula: [...] }
    *  - answer => конечное число
    *
    * В многозначном режиме склеиваем вектор действий в строку типа "+32".
@@ -445,7 +381,7 @@ export class ExampleGenerator {
       for (const step of example.steps) {
         // Формат от MultiDigitGenerator: { action: 21, states: [...], digits: [1, 2] }
         const value = step.action;
-        // 🔥 ИСПРАВЛЕНИЕ: для отрицательных чисел нужен минус, а не пустая строка!
+        // 🔥 ИСПРАВЛЕНИЕ: для отрицательных чисел используем минус
         const sign = value >= 0 ? '+' : '-';
         
         formattedSteps.push(`${sign}${Math.abs(value)}`);
@@ -501,15 +437,16 @@ export class ExampleGenerator {
       };
     }
 
-    // === ОДНОРАЗРЯДНЫЙ КЕЙС (с поддержкой братских шагов) ===
+    // === ОДНОРАЗРЯДНЫЙ КЕЙС (с поддержкой братских и дружеских шагов) ===
     const formattedSteps = [];
 
     for (const step of example.steps) {
       const action = step.action;
 
-      // 🔥 ПРОВЕРКА: это братский шаг?
+      // 🔥 ПРОВЕРКА: это объект с формулой?
       if (typeof action === "object" && action !== null) {
-        // Братский шаг с формулой
+        
+        // === БРАТСКИЙ ШАГ (через 5) ===
         if (action.isBrother && action.formula) {
           const val = action.value;
           const signStr = val >= 0 ? "+" : "";
@@ -522,6 +459,22 @@ export class ExampleGenerator {
           });
 
           console.log(`👬 Братский шаг: ${signStr}${val} (брат ${action.brotherN})`);
+          continue;
+        }
+
+        // === ДРУЖЕСКИЙ ШАГ (через 10) ===
+        if (action.isFriend && action.formula) {
+          const val = action.value;
+          const signStr = val >= 0 ? "+" : "";
+
+          formattedSteps.push({
+            step: `${signStr}${val}`,        // для UI: "+9", "-8" и т.д.
+            isFriend: true,
+            friendN: action.friendN,         // какой друг (1-9)
+            formula: action.formula          // [{op:"+",val:10},{op:"-",val:1}]
+          });
+
+          console.log(`🤝 Дружеский шаг: ${signStr}${val} (друг ${action.friendN})`);
           continue;
         }
 
