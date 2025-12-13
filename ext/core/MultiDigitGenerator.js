@@ -64,9 +64,16 @@ export class MultiDigitGenerator {
       // Максимум нулевых разрядов в примере
       maxZeroDigits: 1,
       
+      // 🆕 КРУГЛЫЕ ЧИСЛА (+10, +20, -30...):
+      // Вероятность генерации круглого числа - 15%
+      roundNumberProbability: 0.15,
+      // Максимум 1 круглое число на весь пример
+      maxRoundNumbersPerExample: 1,
+      
       // Счётчики
       _duplicatesUsed: 0,
-      _zeroDigitsUsed: 0
+      _zeroDigitsUsed: 0,
+      _roundNumbersUsed: 0
     };
     
     // Имя для логов
@@ -129,6 +136,9 @@ export class MultiDigitGenerator {
     const maxAttempts = 500;
     let friendStepsCount = 0; // Счётчик шагов с формулой Friends
     
+    // 🆕 Сбрасываем счётчик круглых чисел
+    this.config._roundNumbersUsed = 0;
+    
     while (steps.length < stepsCount && attempts < maxAttempts) {
       attempts++;
       const isFirst = steps.length === 0;
@@ -178,13 +188,27 @@ export class MultiDigitGenerator {
       const actionValue = this._getActionValue(action);
       const isFriendAction = typeof action === 'object' && action.isFriend;
       
-      if (isFriendAction) {
-        friendStepsCount++;
-      }
-      
       // Формируем шаг
       // Для UI: показываем значение с учётом позиции (например +9 в единицах или +90 в десятках)
       const displayValue = actionValue * Math.pow(10, position);
+      
+      // 🆕 ПРОВЕРКА КРУГЛЫХ ЧИСЕЛ
+      if (this._isRoundNumber(displayValue)) {
+        // Уже использовали максимум?
+        if (this.config._roundNumbersUsed >= this.config.maxRoundNumbersPerExample) {
+          continue; // Пропускаем это круглое число
+        }
+        // Проверяем вероятность (15%)
+        if (Math.random() > this.config.roundNumberProbability) {
+          continue; // Не прошло вероятность
+        }
+        this.config._roundNumbersUsed++;
+        console.log(`  🔵 Принято круглое число ${displayValue}`);
+      }
+      
+      if (isFriendAction) {
+        friendStepsCount++;
+      }
       
       steps.push({
         action: displayValue,
@@ -270,8 +294,10 @@ export class MultiDigitGenerator {
     
     console.log(`🎯 Генерация стандартного примера: ${stepsCount} шагов, разрядов: ${this.displayDigitCount}`);
     
+    // Сбрасываем все счётчики для нового примера
     this.config._duplicatesUsed = 0;
     this.config._zeroDigitsUsed = 0;
+    this.config._roundNumbersUsed = 0;
     
     let attempts = 0;
     const maxTotalAttempts = 1000;
@@ -548,6 +574,7 @@ export class MultiDigitGenerator {
     
     if (value === 0) return false;
     
+    // === ПРОВЕРКА НУЛЕВЫХ РАЗРЯДОВ ===
     const usedDigits = digits.slice(0, this.displayDigitCount);
     const zeroCount = usedDigits.filter(d => d === 0).length;
     if (zeroCount > 0 && zeroCount >= this.displayDigitCount - 1) {
@@ -557,6 +584,27 @@ export class MultiDigitGenerator {
       this.config._zeroDigitsUsed++;
     }
     
+    // === 🆕 ПРОВЕРКА КРУГЛЫХ ЧИСЕЛ (+10, +20, -30...) ===
+    const isRoundNumber = this._isRoundNumber(value);
+    if (isRoundNumber) {
+      // Уже использовали максимум круглых чисел?
+      if (this.config._roundNumbersUsed >= this.config.maxRoundNumbersPerExample) {
+        console.log(`  ⛔ Отклоняем круглое число ${value}: лимит исчерпан`);
+        return false;
+      }
+      
+      // Проверяем вероятность (15%)
+      if (Math.random() > this.config.roundNumberProbability) {
+        console.log(`  ⛔ Отклоняем круглое число ${value}: не прошло вероятность ${this.config.roundNumberProbability * 100}%`);
+        return false;
+      }
+      
+      // Принимаем круглое число
+      this.config._roundNumbersUsed++;
+      console.log(`  ✅ Принято круглое число ${value} (${this.config._roundNumbersUsed}/${this.config.maxRoundNumbersPerExample})`);
+    }
+    
+    // === ПРОВЕРКА ВАЛИДНОСТИ СОСТОЯНИЙ ===
     for (let pos = 0; pos < this.displayDigitCount; pos++) {
       const newState = states[pos] + digits[pos];
       if (newState < 0 || newState > 9) {
@@ -565,6 +613,16 @@ export class MultiDigitGenerator {
     }
     
     return true;
+  }
+
+  /**
+   * 🆕 Проверяет, является ли число круглым (кратным 10)
+   * Круглые числа: 10, 20, 30, 100, 110, 200...
+   * НЕ круглые: 11, 23, 45, 101, 123...
+   */
+  _isRoundNumber(value) {
+    const absValue = Math.abs(value);
+    return absValue >= 10 && absValue % 10 === 0;
   }
 
   /**
