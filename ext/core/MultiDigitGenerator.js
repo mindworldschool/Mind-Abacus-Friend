@@ -126,6 +126,13 @@ export class MultiDigitGenerator {
         continue;
       }
       
+      // 🔴 КРИТИЧНО: Проверка переполнения разрядности!
+      // По ТЗ: "Результат не выходит за пределы выбранной разрядности"
+      if (this._checkOverflow(newStates)) {
+        console.log(`  ⚠️ Переполнение разрядности! Пропускаем шаг.`);
+        continue;
+      }
+      
       // Проверка круглых чисел
       if (this._isRoundNumber(value)) {
         if (this.config._roundNumbersUsed >= this.config.maxRoundNumbersPerExample) {
@@ -299,6 +306,11 @@ export class MultiDigitGenerator {
         }
         if (!allValid) continue;
         
+        // 🔴 КРИТИЧНО: Проверка переполнения разрядности!
+        if (this._checkOverflow(testStates)) {
+          continue; // Это действие приведёт к переполнению
+        }
+        
         return { value, sign: targetSign, digits, hasFriend };
       }
     }
@@ -376,6 +388,13 @@ export class MultiDigitGenerator {
       }
       
       if (!allValid) continue;
+      
+      // 🔴 КРИТИЧНО: Проверка переполнения разрядности!
+      // Для Братьев тоже возможен перенос в следующий разряд
+      if (this._checkOverflow(newStates)) {
+        console.log(`  ⚠️ Переполнение разрядности! Пропускаем шаг.`);
+        continue;
+      }
       
       steps.push({
         action: result.sign * result.value,
@@ -573,6 +592,33 @@ export class MultiDigitGenerator {
     return absValue >= 10 && absValue % 10 === 0;
   }
 
+  /**
+   * Проверка переполнения разрядности.
+   * Для 2-значных чисел результат должен быть 0-99, не 357!
+   * По ТЗ: "Результат не выходит за пределы выбранной разрядности"
+   */
+  _checkOverflow(states) {
+    // Проверяем, что все разряды ВЫШЕ displayDigitCount равны 0
+    for (let i = this.displayDigitCount; i < this.maxDigitCount; i++) {
+      if (states[i] !== 0) {
+        return true; // Есть переполнение!
+      }
+    }
+    return false; // Нет переполнения
+  }
+
+  /**
+   * Получить полное числовое значение состояния (включая перенос).
+   * Используется для отладки и проверки.
+   */
+  _getFullValue(states) {
+    let result = 0;
+    for (let i = 0; i < this.maxDigitCount && i < states.length; i++) {
+      result += states[i] * Math.pow(10, i);
+    }
+    return result;
+  }
+
   _getActionValue(action) {
     if (typeof action === 'object' && action !== null) {
       return action.value !== undefined ? action.value : 0;
@@ -679,6 +725,12 @@ export class MultiDigitGenerator {
       
       if (!this.isValidState(currentStates)) {
         console.error(`❌ MultiDigit: шаг ${i + 1} невалиден`);
+        return false;
+      }
+      
+      // Проверка переполнения разрядности
+      if (this._checkOverflow(currentStates)) {
+        console.error(`❌ MultiDigit: шаг ${i + 1} - переполнение разрядности!`);
         return false;
       }
     }
