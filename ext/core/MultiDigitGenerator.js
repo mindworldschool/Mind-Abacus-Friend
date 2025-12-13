@@ -222,12 +222,13 @@ export class MultiDigitGenerator {
    * 🆕 Применяет действие FriendsRule с учётом переноса
    */
   _applyFriendsAction(states, action, position) {
-    const newStates = [...states];
-    
     // Если у baseRule есть метод applyActionWithCarry - используем его
+    // Сигнатура: applyActionWithCarry(fullState, position, action)
     if (this.baseRule.applyActionWithCarry) {
-      return this.baseRule.applyActionWithCarry(states[position], action, position, states);
+      return this.baseRule.applyActionWithCarry(states, position, action);
     }
+    
+    const newStates = [...states];
     
     // Fallback: ручная обработка переноса
     if (typeof action === 'object' && action.isFriend && action.formula) {
