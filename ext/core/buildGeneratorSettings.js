@@ -14,6 +14,8 @@ import { DEFAULTS } from "../../core/utils/constants.js";
  */
 export function buildGeneratorSettingsFromSettings(st = {}) {
   const actionsCfg = st.actions ?? {};
+  
+  // === БЛОК "ПРОСТО" ===
   const blockSimpleDigits = Array.isArray(st?.blocks?.simple?.digits)
     ? st.blocks.simple.digits
     : [];
@@ -23,6 +25,7 @@ export function buildGeneratorSettingsFromSettings(st = {}) {
       ? blockSimpleDigits.map((d) => parseInt(d, 10))
       : [1, 2, 3, 4];
 
+  // === КОЛИЧЕСТВО ДЕЙСТВИЙ ===
   const genMin =
     actionsCfg.infinite === true
       ? DEFAULTS.ACTIONS_MIN
@@ -39,6 +42,7 @@ export function buildGeneratorSettingsFromSettings(st = {}) {
 
   return {
     blocks: {
+      // === ПРОСТО (без формул) ===
       simple: {
         digits: selectedDigits,
         includeFive:
@@ -49,17 +53,27 @@ export function buildGeneratorSettingsFromSettings(st = {}) {
         onlySubtraction:
           (st.blocks?.simple?.onlySubtraction ?? false)
       },
+
+      // === БРАТЬЯ (через 5) ===
       brothers: {
         active: st.blocks?.brothers?.active ?? false,
-        digits: st.blocks?.brothers?.digits ?? [4],
+        digits: st.blocks?.brothers?.digits ?? [],
         onlyAddition: st.blocks?.brothers?.onlyAddition ?? false,
         onlySubtraction: st.blocks?.brothers?.onlySubtraction ?? false
       },
+
+      // === ДРУЗЬЯ (через 10) ===
       friends: {
-        active: st.blocks?.friends?.active ?? false
+        active: st.blocks?.friends?.active ?? false,
+        digits: st.blocks?.friends?.digits ?? [],
+        onlyAddition: st.blocks?.friends?.onlyAddition ?? false,
+        onlySubtraction: st.blocks?.friends?.onlySubtraction ?? false
       },
+
+      // === МИКС (комбинация правил) - будущее ===
       mix: {
-        active: st.blocks?.mix?.active ?? false
+        active: st.blocks?.mix?.active ?? false,
+        digits: st.blocks?.mix?.digits ?? []
       }
     },
 
