@@ -19,14 +19,14 @@
  * 
  * РЕЖИМЫ РАБОТЫ:
  * 
- * Для "Просто" и "Братья":
- *   - Каждый шаг = многозначное число (+21, -34)
- *   - Цифры генерируются независимо для каждого разряда
+ * Для всех правил (Просто, Братья, Друзья):
+ *   - Каждый шаг = многозначное число (+21, -34, +89)
+ *   - Цифры генерируются для каждого разряда
+ *   - Для Друзей: автоматические переносы при переходе через 10
  * 
- * Для "Друзья":
- *   - Каждый шаг = ОДНОЗНАЧНОЕ действие (+9, -7) в конкретном разряде
- *   - Перенос автоматически влияет на следующий разряд
- *   - Это физически корректно для абакуса!
+ * ОГРАНИЧЕНИЯ:
+ *   - Круглые числа (+10, +20...): вероятность 15%, макс 1 на пример
+ *   - Ответы могут быть любой разрядности, но не превышают выбранную
  */
 
 export class MultiDigitGenerator {
@@ -122,8 +122,8 @@ export class MultiDigitGenerator {
   /**
    * 🆕 Генерация примера для FriendsRule (с переносами!)
    * 
-   * Каждый шаг = однозначное действие в конкретном разряде.
-   * Перенос автоматически влияет на следующий разряд.
+   * Генерирует МНОГОЗНАЧНЫЕ числа (+23, -45), где в каждом разряде
+   * может применяться правило Friends с переносом.
    */
   _generateFriendsExample() {
     let states = this.generateStartState();
@@ -132,46 +132,39 @@ export class MultiDigitGenerator {
     
     console.log(`🤝 Генерация Friends примера: ${stepsCount} шагов, ${this.displayDigitCount} разрядов`);
     
-    let attempts = 0;
-    const maxAttempts = 500;
-    let friendStepsCount = 0; // Счётчик шагов с формулой Friends
-    
-    // 🆕 Сбрасываем счётчик круглых чисел
+    // Сбрасываем все счётчики
+    this.config._duplicatesUsed = 0;
+    this.config._zeroDigitsUsed = 0;
     this.config._roundNumbersUsed = 0;
+    
+    let attempts = 0;
+    const maxAttempts = 1000;
+    let friendStepsCount = 0; // Счётчик шагов с хотя бы одним Friend-переходом
     
     while (steps.length < stepsCount && attempts < maxAttempts) {
       attempts++;
       const isFirst = steps.length === 0;
       
-      // Выбираем случайный разряд для действия
-      const position = Math.floor(Math.random() * this.displayDigitCount);
-      const currentDigitState = states[position];
+      // Генерируем МНОГОЗНАЧНОЕ число
+      const result = this._generateFriendsMultiDigitAction(states, isFirst, steps);
       
-      // Получаем доступные действия от FriendsRule
-      // 🔥 ВАЖНО: передаём fullState для проверки возможности переноса!
-      const availableActions = this.baseRule.getAvailableActions(
-        currentDigitState,
-        isFirst,
-        position,
-        states,  // fullState для проверки переноса
-        steps
-      );
-      
-      if (!availableActions || availableActions.length === 0) {
+      if (!result) {
+        if (attempts % 100 === 0) {
+          console.warn(`⚠️ Попытка ${attempts}: не удалось сгенерировать шаг`);
+        }
         continue;
       }
       
-      // Выбираем случайное действие
-      const action = availableActions[Math.floor(Math.random() * availableActions.length)];
+      const { value, sign, digits, hasFriend, friendPositions } = result;
       
-      // 🔥 Применяем действие С УЧЁТОМ ПЕРЕНОСА!
-      const newStates = this._applyFriendsAction(states, action, position);
+      // Применяем действие к состояниям С УЧЁТОМ ПЕРЕНОСОВ
+      const newStates = this._applyFriendsDigits(states, result);
       
       if (!newStates) {
         continue;
       }
       
-      // Проверяем валидность
+      // Проверяем валидность состояний
       let valid = true;
       for (let i = 0; i < this.displayDigitCount; i++) {
         if (newStates[i] < 0 || newStates[i] > 9) {
@@ -184,46 +177,241 @@ export class MultiDigitGenerator {
         continue;
       }
       
-      // Извлекаем значение действия
-      const actionValue = this._getActionValue(action);
-      const isFriendAction = typeof action === 'object' && action.isFriend;
-      
-      // Формируем шаг
-      // Для UI: показываем значение с учётом позиции (например +9 в единицах или +90 в десятках)
-      const displayValue = actionValue * Math.pow(10, position);
-      
-      // 🆕 ПРОВЕРКА КРУГЛЫХ ЧИСЕЛ
-      if (this._isRoundNumber(displayValue)) {
-        // Уже использовали максимум?
+      // Проверка круглых чисел
+      if (this._isRoundNumber(value)) {
         if (this.config._roundNumbersUsed >= this.config.maxRoundNumbersPerExample) {
-          continue; // Пропускаем это круглое число
+          continue;
         }
-        // Проверяем вероятность (15%)
         if (Math.random() > this.config.roundNumberProbability) {
-          continue; // Не прошло вероятность
+          continue;
         }
         this.config._roundNumbersUsed++;
-        console.log(`  🔵 Принято круглое число ${displayValue}`);
       }
       
-      if (isFriendAction) {
+      if (hasFriend) {
         friendStepsCount++;
       }
+      
+      const displayValue = sign * value;
       
       steps.push({
         action: displayValue,
         states: [...newStates],
-        position: position,
-        isFriend: isFriendAction,
-        formula: action.formula || null,
-        friendN: action.friendN || null
+        digits: digits,
+        hasFriend: hasFriend,
+        friendPositions: friendPositions
       });
       
       states = newStates;
       
       const signStr = displayValue >= 0 ? '+' : '';
-      console.log(`  ✅ Шаг ${steps.length}/${stepsCount}: ${signStr}${displayValue} (разряд ${position}${isFriendAction ? ', FRIEND!' : ''}), состояния: [${states.slice(0, this.displayDigitCount).join(', ')}]`);
+      console.log(`  ✅ Шаг ${steps.length}/${stepsCount}: ${signStr}${displayValue}${hasFriend ? ' (FRIEND!)' : ''}, состояния: [${states.slice(0, this.displayDigitCount).join(', ')}]`);
     }
+    
+    // Валидация: должен быть хотя бы один Friend-шаг!
+    if (friendStepsCount === 0 && attempts < maxAttempts - 100) {
+      console.warn(`⚠️ Пример не содержит Friend-шагов! Перегенерация...`);
+      return this._generateFriendsExample();
+    }
+    
+    console.log(`✅ Friends пример готов: ${steps.length} шагов, ${friendStepsCount} с Friend-переходами`);
+    
+    return {
+      start: this.generateStartState(),
+      steps,
+      answer: [...states]
+    };
+  }
+
+  /**
+   * 🆕 Генерирует многозначное число для FriendsRule
+   * Возвращает объект с информацией о Friend-переходах в каждом разряде
+   */
+  _generateFriendsMultiDigitAction(states, isFirst, previousSteps) {
+    const maxAttempts = 50;
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Собираем доступные действия для каждого разряда
+      const actionsPerPosition = [];
+      
+      for (let pos = 0; pos < this.displayDigitCount; pos++) {
+        const currentState = states[pos];
+        const isFirstForDigit = isFirst && (pos === this.displayDigitCount - 1); // Только старший разряд
+        
+        // Для FriendsRule передаём fullState!
+        const availableActions = this.baseRule.getAvailableActions(
+          currentState,
+          isFirstForDigit || currentState === 0,
+          pos,
+          states,
+          previousSteps
+        );
+        
+        if (!availableActions || availableActions.length === 0) {
+          actionsPerPosition[pos] = [{ value: 0, isFriend: false }];
+        } else {
+          actionsPerPosition[pos] = availableActions.map(a => {
+            if (typeof a === 'object') {
+              return a;
+            }
+            return { value: a, isFriend: false };
+          });
+        }
+      }
+      
+      // Определяем возможные знаки
+      const possibleSigns = new Set();
+      for (const actions of actionsPerPosition) {
+        for (const action of actions) {
+          const val = action.value ?? action;
+          if (val > 0) possibleSigns.add(1);
+          if (val < 0) possibleSigns.add(-1);
+        }
+      }
+      
+      if (possibleSigns.size === 0) continue;
+      
+      // Выбираем знак с учётом баланса
+      const signs = Array.from(possibleSigns);
+      const usedStates = states.slice(0, this.displayDigitCount);
+      const avgState = usedStates.reduce((sum, s) => sum + s, 0) / this.displayDigitCount;
+      
+      // Приоритизация знака
+      if (avgState >= 7 && possibleSigns.has(-1)) {
+        signs.sort((a, b) => a - b); // Минус первым
+      } else if (avgState <= 2 && possibleSigns.has(1) && !isFirst) {
+        signs.sort((a, b) => b - a); // Плюс первым
+      } else {
+        // Случайный порядок
+        for (let i = signs.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [signs[i], signs[j]] = [signs[j], signs[i]];
+        }
+      }
+      
+      for (const targetSign of signs) {
+        const digits = [];
+        const friendPositions = [];
+        let hasFriend = false;
+        let success = true;
+        
+        for (let pos = 0; pos < this.displayDigitCount; pos++) {
+          const actions = actionsPerPosition[pos];
+          
+          // Фильтруем по знаку
+          let filtered = actions.filter(a => {
+            const val = a.value ?? a;
+            return Math.sign(val) === targetSign || val === 0;
+          });
+          
+          if (filtered.length === 0) {
+            // Нет действий нужного знака - пробуем 0
+            digits[pos] = { value: 0, isFriend: false };
+            continue;
+          }
+          
+          // Для первого шага старший разряд не может быть 0 или отрицательным
+          if (isFirst && pos === this.displayDigitCount - 1) {
+            filtered = filtered.filter(a => (a.value ?? a) > 0);
+            if (filtered.length === 0) {
+              success = false;
+              break;
+            }
+          }
+          
+          // Выбираем случайное действие
+          const chosen = filtered[Math.floor(Math.random() * filtered.length)];
+          digits[pos] = chosen;
+          
+          if (chosen.isFriend) {
+            hasFriend = true;
+            friendPositions.push(pos);
+          }
+        }
+        
+        if (!success) continue;
+        
+        // Проверяем что есть хоть одно ненулевое значение
+        const hasNonZero = digits.some(d => (d.value ?? d) !== 0);
+        if (!hasNonZero) continue;
+        
+        // Проверяем что старший разряд не ноль
+        const highestDigit = digits[this.displayDigitCount - 1];
+        if ((highestDigit.value ?? highestDigit) === 0) continue;
+        
+        // Считаем итоговое значение
+        let value = 0;
+        for (let pos = 0; pos < this.displayDigitCount; pos++) {
+          const d = digits[pos].value ?? digits[pos];
+          value += Math.abs(d) * Math.pow(10, pos);
+        }
+        
+        // Проверяем что применение не нарушит границы
+        const testStates = this._applyFriendsDigits(states, { digits, hasFriend });
+        if (!testStates) continue;
+        
+        let allValid = true;
+        for (let i = 0; i < this.displayDigitCount; i++) {
+          if (testStates[i] < 0 || testStates[i] > 9) {
+            allValid = false;
+            break;
+          }
+        }
+        if (!allValid) continue;
+        
+        return {
+          value,
+          sign: targetSign,
+          digits,
+          hasFriend,
+          friendPositions
+        };
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * 🆕 Применяет массив действий (digits) к состояниям с учётом Friend-переносов
+   */
+  _applyFriendsDigits(states, result) {
+    const newStates = [...states];
+    const digits = result.digits;
+    
+    for (let pos = 0; pos < this.displayDigitCount; pos++) {
+      const action = digits[pos];
+      
+      if (!action) continue;
+      
+      if (typeof action === 'object' && action.isFriend && action.formula) {
+        // Friend-переход с переносом
+        for (const part of action.formula) {
+          if (Math.abs(part.val) === 10) {
+            // Перенос в следующий разряд
+            const carryValue = part.op === '+' ? 1 : -1;
+            const nextPos = pos + 1;
+            
+            if (nextPos < this.maxDigitCount) {
+              newStates[nextPos] += carryValue;
+            } else {
+              return null; // Нет места для переноса
+            }
+          } else {
+            // Действие в текущем разряде
+            const digitValue = part.op === '+' ? part.val : -part.val;
+            newStates[pos] += digitValue;
+          }
+        }
+      } else {
+        // Простое действие
+        const value = action.value ?? action;
+        newStates[pos] += value;
+      }
+    }
+    
+    return newStates;
+  }
     
     // Валидация: должен быть хотя бы один Friend-шаг!
     if (friendStepsCount === 0) {
@@ -240,48 +428,6 @@ export class MultiDigitGenerator {
       steps,
       answer: [...states]
     };
-  }
-
-  /**
-   * 🆕 Применяет действие FriendsRule с учётом переноса
-   */
-  _applyFriendsAction(states, action, position) {
-    // Если у baseRule есть метод applyActionWithCarry - используем его
-    // Сигнатура: applyActionWithCarry(fullState, position, action)
-    if (this.baseRule.applyActionWithCarry) {
-      return this.baseRule.applyActionWithCarry(states, position, action);
-    }
-    
-    const newStates = [...states];
-    
-    // Fallback: ручная обработка переноса
-    if (typeof action === 'object' && action.isFriend && action.formula) {
-      // Friend формула: [{op:'+',val:10},{op:'-',val:1}] или [{op:'-',val:10},{op:'+',val:1}]
-      for (const part of action.formula) {
-        if (Math.abs(part.val) === 10) {
-          // Перенос в следующий разряд
-          const carryValue = part.op === '+' ? 1 : -1;
-          const nextPos = position + 1;
-          
-          if (nextPos < this.maxDigitCount) {
-            newStates[nextPos] += carryValue;
-          } else {
-            // Нет места для переноса!
-            return null;
-          }
-        } else {
-          // Действие в текущем разряде
-          const digitValue = part.op === '+' ? part.val : -part.val;
-          newStates[position] += digitValue;
-        }
-      }
-    } else {
-      // Простое действие (не Friend)
-      const value = this._getActionValue(action);
-      newStates[position] += value;
-    }
-    
-    return newStates;
   }
 
   /**
@@ -639,16 +785,48 @@ export class MultiDigitGenerator {
    * Применяет действие к состоянию
    */
   applyAction(state, action) {
+    // 🆕 Обработка шага с digits (из Friends и Standard генерации)
     if (typeof action === 'object' && action.digits) {
       const newState = [...state];
-      for (let pos = 0; pos < this.maxDigitCount; pos++) {
-        newState[pos] += (action.digits[pos] || 0);
+      
+      for (let pos = 0; pos < this.displayDigitCount; pos++) {
+        const digit = action.digits[pos];
+        
+        if (!digit) continue;
+        
+        // 🆕 Friends: digit может быть объектом с formula
+        if (typeof digit === 'object' && digit.isFriend && digit.formula) {
+          // Применяем формулу Friends с переносом
+          for (const part of digit.formula) {
+            if (Math.abs(part.val) === 10) {
+              // Перенос
+              const carryValue = part.op === '+' ? 1 : -1;
+              const nextPos = pos + 1;
+              if (nextPos < this.maxDigitCount) {
+                newState[nextPos] += carryValue;
+              }
+            } else {
+              // Действие в текущем разряде
+              const digitValue = part.op === '+' ? part.val : -part.val;
+              newState[pos] += digitValue;
+            }
+          }
+        } else if (typeof digit === 'object') {
+          // Объект с value
+          newState[pos] += (digit.value ?? 0);
+        } else {
+          // Простое число
+          newState[pos] += digit;
+        }
       }
+      
       return newState;
     }
     
-    const absValue = Math.abs(action);
-    const sign = Math.sign(action);
+    // Стандартная обработка числа
+    const actionValue = typeof action === 'object' ? action.action : action;
+    const absValue = Math.abs(actionValue);
+    const sign = Math.sign(actionValue);
     const digits = this._numberToDigits(absValue);
     
     const newState = [...state];
@@ -747,7 +925,7 @@ export class MultiDigitGenerator {
     
     // 🆕 4. Для FriendsRule: проверяем наличие Friend-шагов
     if (this.isFriendsRule) {
-      const friendSteps = steps.filter(s => s.isFriend);
+      const friendSteps = steps.filter(s => s.hasFriend || s.isFriend);
       if (friendSteps.length === 0) {
         console.error('❌ MultiDigit Friends: нет шагов с формулой Friends!');
         return false;
