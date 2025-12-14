@@ -485,20 +485,42 @@ export class FriendsRule extends BaseRule {
    * @param {Array} previousSteps - история шагов для избежания повторов
    */
   getAvailableActions(currentState, isFirstAction = false, position = 0, fullState = null, previousSteps = []) {
-    const { 
-      onlyAddition, 
-      onlySubtraction, 
-      friendsDigits, 
-      simpleBlockDigits 
+    const {
+      onlyAddition,
+      onlySubtraction,
+      friendsDigits,
+      simpleBlockDigits
     } = this.config;
-    
-    const v = currentState;
+
+    // 🔴 КРИТИЧНО: Преобразуем число в массив разрядов если нужно
+    // Если currentState - это ЧИСЛО (например 34), а не разряд [0-9],
+    // значит мы в однозначном режиме и нужно преобразовать в массив
+    let v = currentState;
+    let state = fullState;
+
+    if (typeof currentState === 'number' && currentState > 9) {
+      // Это ЦЕЛОЕ ЧИСЛО, а не разряд! Преобразуем в массив разрядов
+      const digits = [];
+      let num = Math.abs(currentState);
+      for (let i = 0; i < 10; i++) {
+        digits.push(num % 10);
+        num = Math.floor(num / 10);
+        if (num === 0 && i >= 1) break;
+      }
+      state = digits;
+      v = digits[position] || 0; // Значение текущего разряда
+
+      console.log(`🔄 Преобразовали число ${currentState} → массив [${digits.join(', ')}], разряд ${position} = ${v}`);
+    } else if (!state) {
+      // fullState не передан, создаём минимальный массив
+      // Для разряда 0-9 создаём массив где текущая позиция = v
+      v = currentState;
+      state = Array(10).fill(0);
+      state[position] = v;
+    }
+
     const friendActions = [];
     const simpleActions = [];
-
-    // Если fullState не передан, создаём минимальный массив
-    // Для многозначных чисел fullState ДОЛЖЕН быть передан из MultiDigitGenerator
-    const state = fullState || [v, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
     // === АНАЛИЗ ПРЕДЫДУЩИХ ШАГОВ ДЛЯ ИЗБЕЖАНИЯ ПОВТОРОВ ===
     const getStepValue = (step) => {
@@ -619,13 +641,41 @@ export class FriendsRule extends BaseRule {
 
   /**
    * Применение действия к состоянию
-   * 
+   *
    * ВАЖНО: Для дружеских шагов нужно также обновить следующий разряд!
-   * Это должно обрабатываться в MultiDigitGenerator.
-   * Здесь мы возвращаем только изменение ТЕКУЩЕГО разряда.
+   * Если currentState - число, преобразуем в массив, применяем действие, возвращаем число.
    */
   applyAction(currentState, action) {
     const delta = typeof action === "object" ? action.value : action;
+    const isFriend = typeof action === "object" && action.isFriend;
+
+    // Если это простое число (не массив), обрабатываем как одноразрядный режим
+    if (typeof currentState === 'number' && !isFriend) {
+      return currentState + delta;
+    }
+
+    // Если это дружеский шаг в одноразрядном режиме - преобразуем в многозначный
+    if (typeof currentState === 'number' && isFriend) {
+      // Преобразуем число в массив разрядов
+      const digits = [];
+      let num = Math.abs(currentState);
+      for (let i = 0; i < 10; i++) {
+        digits.push(num % 10);
+        num = Math.floor(num / 10);
+        if (num === 0 && i >= 1) break;
+      }
+
+      // Применяем дружеское действие к массиву
+      const newState = this.applyActionWithCarry(digits, 0, action);
+
+      // Преобразуем обратно в число
+      let result = 0;
+      for (let i = 0; i < newState.length; i++) {
+        result += newState[i] * Math.pow(10, i);
+      }
+      return result;
+    }
+
     return currentState + delta;
   }
 
