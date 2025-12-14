@@ -703,74 +703,62 @@ export class FriendsRule extends BaseRule {
     const { minState, maxState } = this.config;
 
     if (!steps || steps.length < 1) {
-      console.warn("❌ validateExample: нет шагов");
+      console.warn("❌ FriendsRule validateExample: нет шагов");
       return false;
     }
 
     // Определяем тип примера: одноразрядный или многозначный
     const isMultiDigit = Array.isArray(start);
-
-    let state = isMultiDigit ? [...start] : start;
     let hasFriend = false;
 
-    // Проходим по всем шагам
-    for (const step of steps) {
-      const act = step.action ?? step;
+    // Проходим по всем шагам и проверяем states
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
 
-      if (isMultiDigit) {
-        // МНОГОЗНАЧНЫЕ: используем данные из step.digits если есть
-        if (step.digits && Array.isArray(step.digits)) {
-          // Применяем поразрядно с учётом переносов
-          state = this._applyMultiDigitAction(state, step.digits);
-        } else {
-          // Fallback: простое применение числового значия
-          const value = typeof act === 'object' ? act.value : act;
-          state = this._applyNumericToArray(state, value);
-        }
+      // Проверяем наличие дружеских шагов
+      if (step.hasFriend === true) {
+        hasFriend = true;
+      }
 
-        // Проверяем каждый разряд
-        for (let i = 0; i < state.length; i++) {
-          if (state[i] < minState || state[i] > maxState) {
-            console.warn(`❌ validateExample: разряд ${i} выход за диапазон [${minState}, ${maxState}]: ${state[i]}`);
+      // Проверяем валидность состояния из step.states
+      if (step.states) {
+        const state = step.states;
+
+        if (isMultiDigit && Array.isArray(state)) {
+          // Проверяем каждый разряд
+          for (let j = 0; j < state.length; j++) {
+            if (state[j] < minState || state[j] > maxState) {
+              console.warn(`❌ FriendsRule validateExample: шаг ${i+1}, разряд ${j} выход за диапазон [${minState}, ${maxState}]: ${state[j]}`);
+              return false;
+            }
+          }
+        } else if (!isMultiDigit && typeof state === 'number') {
+          // Одноразрядный
+          if (state < minState || state > maxState) {
+            console.warn(`❌ FriendsRule validateExample: шаг ${i+1} выход за диапазон [${minState}, ${maxState}]: ${state}`);
             return false;
           }
         }
-      } else {
-        // ОДНОРАЗРЯДНЫЕ: текущая логика
-        state = this.applyAction(state, act);
-
-        if (state < minState || state > maxState) {
-          console.warn(`❌ validateExample: выход за диапазон [${minState}, ${maxState}]: ${state}`);
-          return false;
-        }
-      }
-
-      // Проверяем наличие дружеских шагов
-      if (typeof act === "object" && act.isFriend) {
-        hasFriend = true;
-      }
-      // Также проверяем step.hasFriend (для многозначных)
-      if (step.hasFriend === true) {
-        hasFriend = true;
       }
     }
 
     // Проверяем финальный ответ
+    const finalState = steps[steps.length - 1]?.states || answer;
     const answersMatch = isMultiDigit
-      ? this._arraysEqual(state, answer)
-      : state === answer;
+      ? this._arraysEqual(finalState, answer)
+      : finalState === answer;
 
     if (!answersMatch) {
-      console.warn(`❌ validateExample: ответ не совпадает:`, { state, answer });
+      console.warn(`❌ FriendsRule validateExample: ответ не совпадает:`, { finalState, answer });
       return false;
     }
 
     if (!hasFriend) {
-      console.warn("❌ validateExample: нет дружеских шагов");
+      console.warn("❌ FriendsRule validateExample: нет дружеских шагов");
       return false;
     }
 
-    console.log(`✅ validateExample: пример валидный (${steps.length} шагов, есть дружеские)`);
+    console.log(`✅ FriendsRule validateExample: пример валидный (${steps.length} шагов, есть дружеские)`);
     return true;
   }
 
