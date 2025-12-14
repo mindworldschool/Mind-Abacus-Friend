@@ -693,6 +693,10 @@ export class FriendsRule extends BaseRule {
 
   /**
    * Валидация примера: должен содержать хотя бы 1 дружеский шаг
+   *
+   * Поддерживает ОДНОРАЗРЯДНЫЕ и МНОГОЗНАЧНЫЕ примеры:
+   * - Одноразрядные: start = 0, answer = 7
+   * - Многозначные: start = [0,0,0], answer = [3,2,1] (123)
    */
   validateExample(example) {
     const { start, steps, answer } = example;
@@ -703,25 +707,61 @@ export class FriendsRule extends BaseRule {
       return false;
     }
 
-    let s = start;
+    // Определяем тип примера: одноразрядный или многозначный
+    const isMultiDigit = Array.isArray(start);
+
+    let state = isMultiDigit ? [...start] : start;
     let hasFriend = false;
 
+    // Проходим по всем шагам
     for (const step of steps) {
       const act = step.action ?? step;
-      s = this.applyAction(s, act);
-      
-      if (s < minState || s > maxState) {
-        console.warn(`❌ validateExample: выход за диапазон [${minState}, ${maxState}]: ${s}`);
-        return false;
+
+      if (isMultiDigit) {
+        // МНОГОЗНАЧНЫЕ: используем данные из step.digits если есть
+        if (step.digits && Array.isArray(step.digits)) {
+          // Применяем поразрядно с учётом переносов
+          state = this._applyMultiDigitAction(state, step.digits);
+        } else {
+          // Fallback: простое применение числового значия
+          const value = typeof act === 'object' ? act.value : act;
+          state = this._applyNumericToArray(state, value);
+        }
+
+        // Проверяем каждый разряд
+        for (let i = 0; i < state.length; i++) {
+          if (state[i] < minState || state[i] > maxState) {
+            console.warn(`❌ validateExample: разряд ${i} выход за диапазон [${minState}, ${maxState}]: ${state[i]}`);
+            return false;
+          }
+        }
+      } else {
+        // ОДНОРАЗРЯДНЫЕ: текущая логика
+        state = this.applyAction(state, act);
+
+        if (state < minState || state > maxState) {
+          console.warn(`❌ validateExample: выход за диапазон [${minState}, ${maxState}]: ${state}`);
+          return false;
+        }
       }
-      
+
+      // Проверяем наличие дружеских шагов
       if (typeof act === "object" && act.isFriend) {
+        hasFriend = true;
+      }
+      // Также проверяем step.hasFriend (для многозначных)
+      if (step.hasFriend === true) {
         hasFriend = true;
       }
     }
 
-    if (s !== answer) {
-      console.warn(`❌ validateExample: ответ не совпадает: ${s} !== ${answer}`);
+    // Проверяем финальный ответ
+    const answersMatch = isMultiDigit
+      ? this._arraysEqual(state, answer)
+      : state === answer;
+
+    if (!answersMatch) {
+      console.warn(`❌ validateExample: ответ не совпадает:`, { state, answer });
       return false;
     }
 
@@ -732,5 +772,78 @@ export class FriendsRule extends BaseRule {
 
     console.log(`✅ validateExample: пример валидный (${steps.length} шагов, есть дружеские)`);
     return true;
+  }
+
+  /**
+   * Применить многозначное действие с учётом переносов
+   * @private
+   */
+  _applyMultiDigitAction(state, digits) {
+    const newState = [...state];
+
+    for (let pos = 0; pos < digits.length; pos++) {
+      const action = digits[pos];
+      if (!action) continue;
+
+      if (typeof action === 'object' && action.isFriend && action.formula) {
+        // Дружеский шаг: применяем формулу
+        for (const part of action.formula) {
+          if (Math.abs(part.val) === 10) {
+            // Перенос в следующий разряд
+            const carryValue = part.op === '+' ? 1 : -1;
+            const nextPos = pos + 1;
+            if (nextPos < newState.length) {
+              newState[nextPos] += carryValue;
+            }
+          } else {
+            // Действие на текущем разряде
+            const digitValue = part.op === '+' ? part.val : -part.val;
+            newState[pos] += digitValue;
+          }
+        }
+      } else if (typeof action === 'object') {
+        // Простой объект с value
+        newState[pos] += (action.value || 0);
+      } else {
+        // Числовое действие
+        newState[pos] += action;
+      }
+    }
+
+    return newState;
+  }
+
+  /**
+   * Применить числовое значение к массиву (для fallback)
+   * @private
+   */
+  _applyNumericToArray(state, value) {
+    const newState = [...state];
+    let carry = value;
+
+    for (let i = 0; i < newState.length && carry !== 0; i++) {
+      newState[i] += carry;
+
+      if (newState[i] >= 10) {
+        carry = Math.floor(newState[i] / 10);
+        newState[i] = newState[i] % 10;
+      } else if (newState[i] < 0) {
+        carry = -1;
+        newState[i] += 10;
+      } else {
+        carry = 0;
+      }
+    }
+
+    return newState;
+  }
+
+  /**
+   * Сравнение двух массивов
+   * @private
+   */
+  _arraysEqual(a, b) {
+    if (a.length !== b.length) return false;
+    return a.every((val, idx) => val === b[idx]);
   }
 }
