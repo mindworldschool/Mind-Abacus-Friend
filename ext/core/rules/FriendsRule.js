@@ -454,9 +454,20 @@ export class FriendsRule extends BaseRule {
 
   /**
    * Проверка валидности состояния
+   *
+   * ВАЖНО: Для правила Друзья число может быть > 9 в однозначном режиме!
+   * Например: 7+9=16, где 16 = [6, 1] (6 единиц + 1 десяток)
    */
   isValidState(v) {
-    return v >= this.config.minState && v <= this.config.maxState;
+    // Для массива (многозначный режим)
+    if (Array.isArray(v)) {
+      return v.every(digit => digit >= this.config.minState && digit <= this.config.maxState);
+    }
+
+    // Для числа (однозначный режим)
+    // Разрешаем любое неотрицательное число для правила Друзья
+    // т.к. перенос в следующий разряд даёт числа > 9
+    return v >= this.config.minState;
   }
 
   /**
@@ -761,21 +772,27 @@ export class FriendsRule extends BaseRule {
     const isMultiDigit = Array.isArray(start);
     let hasFriend = false;
 
-    // Проходим по всем шагам и проверяем states
+    // Проходим по всем шагам и проверяем
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
 
-      // Проверяем наличие дружеских шагов
+      // 🔴 КРИТИЧНО: Проверяем наличие дружеских шагов в ДВУХ форматах
+      // Формат 1 (MultiDigitGenerator): step.hasFriend === true
+      // Формат 2 (ExampleGenerator): step.action.isFriend === true
       if (step.hasFriend === true) {
+        hasFriend = true;
+      } else if (step.action && typeof step.action === 'object' && step.action.isFriend === true) {
         hasFriend = true;
       }
 
-      // Проверяем валидность состояния из step.states
-      if (step.states) {
-        const state = step.states;
+      // Проверяем валидность состояния
+      // Формат 1 (MultiDigitGenerator): step.states
+      // Формат 2 (ExampleGenerator): step.toState
+      const state = step.states || step.toState;
 
+      if (state !== undefined) {
         if (isMultiDigit && Array.isArray(state)) {
-          // Проверяем каждый разряд
+          // Многозначный: проверяем каждый разряд
           for (let j = 0; j < state.length; j++) {
             if (state[j] < minState || state[j] > maxState) {
               console.warn(`❌ FriendsRule validateExample: шаг ${i+1}, разряд ${j} выход за диапазон [${minState}, ${maxState}]: ${state[j]}`);
@@ -783,9 +800,12 @@ export class FriendsRule extends BaseRule {
             }
           }
         } else if (!isMultiDigit && typeof state === 'number') {
-          // Одноразрядный
-          if (state < minState || state > maxState) {
-            console.warn(`❌ FriendsRule validateExample: шаг ${i+1} выход за диапазон [${minState}, ${maxState}]: ${state}`);
+          // Одноразрядный: проверяем число
+          // НО! Для правила Друзья число может быть > 9 (перенос в следующий разряд)
+          // Например: 7+9=16, где 16 = [6, 1] = 6 единиц + 1 десяток
+          // Это валидно! Не проверяем maxState для однозначного режима с друзьями
+          if (state < minState) {
+            console.warn(`❌ FriendsRule validateExample: шаг ${i+1} выход за диапазон (< ${minState}): ${state}`);
             return false;
           }
         }
@@ -793,7 +813,7 @@ export class FriendsRule extends BaseRule {
     }
 
     // Проверяем финальный ответ
-    const finalState = steps[steps.length - 1]?.states || answer;
+    const finalState = steps[steps.length - 1]?.states || steps[steps.length - 1]?.toState || answer;
     const answersMatch = isMultiDigit
       ? this._arraysEqual(finalState, answer)
       : finalState === answer;
