@@ -33,13 +33,31 @@ export class FriendsRule extends BaseRule {
     // Имя правила
     this.name = "Друзья";
 
-    // Какие "друзья" тренируем: [1..9]
-    // По умолчанию все цифры от 1 до 9
+    // 🔴 КРИТИЧНО: Какие цифры "друзья" тренируем: [1..9]
+    // Это определяет какие действия через правило Друзья будут доступны
+    //
+    // Примеры:
+    // - Если selectedDigits = [1]:
+    //   Доступны: +1 = +10-9, -1 = -10+9
+    //
+    // - Если selectedDigits = [9]:
+    //   Доступны: +9 = +10-1, -9 = -10+1
+    //
+    // - Если selectedDigits = [1,2,3]:
+    //   Доступны: +1,+2,+3,-1,-2,-3 через друзей
+    //
+    // - Если НЕ указано: все цифры 1-9
     const friendsDigits = Array.isArray(config.selectedDigits)
       ? config.selectedDigits
           .map(n => parseInt(n, 10))
           .filter(n => n >= 1 && n <= 9)
       : [9, 8, 7, 6, 5, 4, 3, 2, 1];
+
+    // Важно: должна быть хотя бы одна цифра!
+    if (friendsDigits.length === 0) {
+      console.warn("⚠️ FriendsRule: не выбрано ни одной цифры! Используем [9]");
+      friendsDigits.push(9);
+    }
 
     // Какие цифры разрешены в блоке "Просто" для вспомогательных шагов
     const simpleBlockDigits = config.blocks?.simple?.digits
@@ -66,7 +84,6 @@ export class FriendsRule extends BaseRule {
       onlySubtraction: config.onlySubtraction ?? false,
       digitCount: config.digitCount ?? 1,
       combineLevels: config.combineLevels ?? false,
-      friendPriority: 0.6, // 60% приоритет дружеским шагам
       blocks: config.blocks ?? {}
     };
 
@@ -567,6 +584,8 @@ export class FriendsRule extends BaseRule {
     };
 
     // === ДРУЖЕСКИЕ ШАГИ ===
+    // Перебираем ТОЛЬКО выбранные цифры friendsDigits (например, [1,2,3])
+    // Это означает что будут доступны ТОЛЬКО эти действия через Друзья
     for (const n of friendsDigits) {
       const friend = 10 - n;
 
@@ -635,18 +654,16 @@ export class FriendsRule extends BaseRule {
       }
     }
 
-    // === ПРИОРИТИЗАЦИЯ: дружеские шаги важнее ===
-    if (friendActions.length > 0 && Math.random() < this.config.friendPriority) {
-      console.log(`🤝 Приоритет дружеским шагам из ${v} (доступно ${friendActions.length})`);
-      return friendActions;
-    }
-
+    // === ВОЗВРАЩАЕМ ВСЕ ДОСТУПНЫЕ ДЕЙСТВИЯ ===
+    // Генератор сам решит что выбрать: Friend-действие или простое
+    // Валидация проверит что есть хотя бы 1 Friend-шаг в итоговом примере
     const allActions = [...friendActions, ...simpleActions];
+
     console.log(
       `🎲 Состояние ${v}: дружеских=${friendActions.length}, ` +
       `простых=${simpleActions.length}, всего=${allActions.length}`
     );
-    
+
     return allActions;
   }
 
@@ -771,6 +788,7 @@ export class FriendsRule extends BaseRule {
     // Определяем тип примера: одноразрядный или многозначный
     const isMultiDigit = Array.isArray(start);
     let hasFriend = false;
+    const usedFriendDigits = new Set(); // Отслеживаем какие цифры Друзья использовались
 
     // Проходим по всем шагам и проверяем
     for (let i = 0; i < steps.length; i++) {
@@ -781,8 +799,22 @@ export class FriendsRule extends BaseRule {
       // Формат 2 (ExampleGenerator): step.action.isFriend === true
       if (step.hasFriend === true) {
         hasFriend = true;
+
+        // Собираем информацию о том, какая цифра Друзья использовалась
+        if (step.digits) {
+          for (const digit of step.digits) {
+            if (digit && digit.isFriend && digit.friendN) {
+              usedFriendDigits.add(digit.friendN);
+            }
+          }
+        }
       } else if (step.action && typeof step.action === 'object' && step.action.isFriend === true) {
         hasFriend = true;
+
+        // Собираем информацию о том, какая цифра Друзья использовалась
+        if (step.action.friendN) {
+          usedFriendDigits.add(step.action.friendN);
+        }
       }
 
       // Проверяем валидность состояния
@@ -828,7 +860,23 @@ export class FriendsRule extends BaseRule {
       return false;
     }
 
-    console.log(`✅ FriendsRule validateExample: пример валидный (${steps.length} шагов, есть дружеские)`);
+    // 🔴 КРИТИЧНО: Проверяем что использованные цифры Друзья входят в разрешённый список
+    const allowedDigits = new Set(this.config.friendsDigits);
+    for (const usedDigit of usedFriendDigits) {
+      if (!allowedDigits.has(usedDigit)) {
+        console.warn(
+          `❌ FriendsRule validateExample: использована цифра ${usedDigit}, ` +
+          `которой нет в разрешённых [${this.config.friendsDigits.join(', ')}]`
+        );
+        return false;
+      }
+    }
+
+    const usedDigitsStr = Array.from(usedFriendDigits).sort((a, b) => a - b).join(', ');
+    console.log(
+      `✅ FriendsRule validateExample: пример валидный ` +
+      `(${steps.length} шагов, использованы друзья: [${usedDigitsStr}])`
+    );
     return true;
   }
 
