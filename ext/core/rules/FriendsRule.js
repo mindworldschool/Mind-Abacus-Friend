@@ -84,7 +84,6 @@ export class FriendsRule extends BaseRule {
       onlySubtraction: config.onlySubtraction ?? false,
       digitCount: config.digitCount ?? 1,
       combineLevels: config.combineLevels ?? false,
-      friendPriority: 0.6, // 60% приоритет дружеским шагам
       blocks: config.blocks ?? {}
     };
 
@@ -655,18 +654,16 @@ export class FriendsRule extends BaseRule {
       }
     }
 
-    // === ПРИОРИТИЗАЦИЯ: дружеские шаги важнее ===
-    if (friendActions.length > 0 && Math.random() < this.config.friendPriority) {
-      console.log(`🤝 Приоритет дружеским шагам из ${v} (доступно ${friendActions.length})`);
-      return friendActions;
-    }
-
+    // === ВОЗВРАЩАЕМ ВСЕ ДОСТУПНЫЕ ДЕЙСТВИЯ ===
+    // Генератор сам решит что выбрать: Friend-действие или простое
+    // Валидация проверит что есть хотя бы 1 Friend-шаг в итоговом примере
     const allActions = [...friendActions, ...simpleActions];
+
     console.log(
       `🎲 Состояние ${v}: дружеских=${friendActions.length}, ` +
       `простых=${simpleActions.length}, всего=${allActions.length}`
     );
-    
+
     return allActions;
   }
 
