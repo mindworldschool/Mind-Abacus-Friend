@@ -634,8 +634,10 @@ export function mountTrainerUI(container, {
       };
 
       eventBus.emit(EVENTS.TRAINING_FINISH, {
-        stats: session.stats,
-        incorrectExamples: session.incorrectExamples
+        phase: "done",
+        correct: session.stats.correct,
+        total: session.stats.total,
+        wrongExamples: session.incorrectExamples
       });
 
       onShowResultsScreen?.();
