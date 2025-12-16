@@ -354,8 +354,17 @@ export function renderSettings(container, { t, state, updateSettings, navigate }
     return allOptions;
   }
 
+  // Проверяем и корректируем начальное значение
+  let initialDigitsValue = settingsState.digits;
+  const friendsActive = state.settings.blocks?.friends?.digits?.length > 0;
+  if (friendsActive && initialDigitsValue === "1") {
+    console.warn("⚠️ Друзья активны, но выбран 1 разряд. Автоматически переключаем на 2.");
+    initialDigitsValue = "2";
+    updateSettings({ digits: "2" });
+  }
+
   // Создаём select с фильтрованными опциями
-  const digitsSelect = createSelect(getDigitsOptions(), settingsState.digits, (value) => {
+  const digitsSelect = createSelect(getDigitsOptions(), initialDigitsValue, (value) => {
     updateSettings({ digits: value });
   });
 
