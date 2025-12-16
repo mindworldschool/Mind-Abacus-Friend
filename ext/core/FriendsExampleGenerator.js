@@ -365,7 +365,10 @@ export class FriendsExampleGenerator {
       // Решаем: пытаться ли сгенерировать Friends действие
       const needMoreFriends = friendStepsCount < minFriendSteps;
       const wantMoreFriends = friendStepsCount < targetFriendSteps;
-      const tryFriend = needMoreFriends || (wantMoreFriends && stepsRemaining >= 2 && Math.random() < 0.6);
+
+      // Более мягкое условие: пытаемся Friends только если есть место (минимум 2 шага)
+      // и либо нужны Friends, либо хотим их с вероятностью 40%
+      const tryFriend = needMoreFriends || (wantMoreFriends && stepsRemaining >= 2 && Math.random() < 0.4);
 
       if (tryFriend) {
         // Планируем последовательность действий для Friends
@@ -416,7 +419,12 @@ export class FriendsExampleGenerator {
       const action = this._generateSimpleAction(states, isFirst);
 
       if (!action) {
-        continue; // Ничего не подошло, пробуем ещё раз
+        // Ничего не подошло - пробуем сбросить состояние или продолжить
+        // Если уже есть минимум шагов с Friends - завершаем
+        if (steps.length >= this.config.minSteps && friendStepsCount >= minFriendSteps) {
+          break;
+        }
+        continue;
       }
 
       // Применяем действие
@@ -523,24 +531,63 @@ export class FriendsExampleGenerator {
    * Минимальный fallback-пример если генерация не удалась
    */
   _fallbackExample() {
-    // Простейший пример: 0 +9 → 9 +1 → 10 (через Friends)
+    const steps = [];
+    let states = Array(this.config.digitCount).fill(0);
+
+    // Генерируем достаточное количество шагов (минимум minSteps)
+    const targetSteps = this.config.minSteps;
+
+    // Сначала добавляем простые шаги для разнообразия
+    const simpleStepsCount = Math.max(1, targetSteps - 2);
+
+    for (let i = 0; i < simpleStepsCount; i++) {
+      const action = (i % 2 === 0) ? 2 : 3; // Чередуем +2 и +3
+      const newStates = [...states];
+      newStates[0] += action;
+
+      steps.push({
+        action: action,
+        isFriend: false,
+        states: [...newStates]
+      });
+
+      states = newStates;
+    }
+
+    // Теперь подводим к состоянию 9 для Friends действия +1
+    const currentValue = states[0];
+    const needToAdd = 9 - currentValue;
+
+    if (needToAdd > 0) {
+      const newStates = [...states];
+      newStates[0] = 9;
+
+      steps.push({
+        action: needToAdd,
+        isFriend: false,
+        states: [...newStates]
+      });
+
+      states = newStates;
+    }
+
+    // Добавляем Friends действие +1
+    steps.push({
+      action: 1,
+      isFriend: true,
+      friendN: 1,
+      formula: [{ op: '+', val: 10 }, { op: '-', val: 9 }],
+      states: [0, states[1] + 1, ...states.slice(2)]
+    });
+
+    states = [0, states[1] + 1, ...states.slice(2)];
+
+    console.log(`⚠️ Используем fallback пример с ${steps.length} шагами`);
+
     return {
       start: Array(this.config.digitCount).fill(0),
-      steps: [
-        {
-          action: 9,
-          isFriend: false,
-          states: [9, 0]
-        },
-        {
-          action: 1,
-          isFriend: true,
-          friendN: 1,
-          formula: [{ op: '+', val: 10 }, { op: '-', val: 9 }],
-          states: [0, 1]
-        }
-      ],
-      answer: [0, 1]
+      steps,
+      answer: [...states]
     };
   }
 
