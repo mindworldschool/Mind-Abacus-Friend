@@ -77,114 +77,223 @@ export class MultiDigitGenerator {
     return this._generateStandardExample();
   }
 
-  // ========== FRIENDS ГЕНЕРАЦИЯ ==========
+  // ========== FRIENDS ГЕНЕРАЦИЯ (НОВАЯ ЛОГИКА) ==========
 
+  /**
+   * 🆕 ПЕРЕПИСАНО: Генерация примера с правилом Друзья
+   *
+   * КЛЮЧЕВОЕ ОТЛИЧИЕ ОТ СТАРОЙ ВЕРСИИ:
+   * - Генерируем ОДНОЗНАЧНЫЕ действия (+1, +2, +3), а не многозначные (+14, +31)
+   * - Используем Simple действия для подготовки состояния
+   * - Применяем Friends действия когда физически возможно
+   * - Работает для ВСЕХ разрядностей (2, 3, 4, и т.д.)
+   */
   _generateFriendsExample(retryDepth = 0) {
-    const maxRetryDepth = 3; // Максимум 3 попытки регенерации
+    const maxRetryDepth = 3;
 
     let states = this.generateStartState();
     const stepsCount = this.generateStepsCount();
     const steps = [];
 
-    console.log(`🤝 Генерация Friends примера: ${stepsCount} шагов, ${this.displayDigitCount} разрядов (попытка ${retryDepth + 1}/${maxRetryDepth + 1})`);
+    console.log(`🤝 [НОВАЯ ЛОГИКА] Генерация Friends: ${stepsCount} шагов, ${this.displayDigitCount} разрядов`);
+    console.log(`   Выбранные цифры для Friends: [${this.baseRule.config.friendsDigits.join(', ')}]`);
 
-    this.config._duplicatesUsed = 0;
-    this.config._zeroDigitsUsed = 0;
-    this.config._roundNumbersUsed = 0;
-
+    let friendStepsCount = 0;
     let attempts = 0;
     const maxAttempts = 1000;
-    let friendStepsCount = 0;
+
+    // Целевое количество Friends действий (минимум 1, лучше 30-50% от общего)
+    const minFriendSteps = 1;
+    const targetFriendSteps = Math.max(1, Math.floor(stepsCount * 0.4));
 
     while (steps.length < stepsCount && attempts < maxAttempts) {
       attempts++;
       const isFirst = steps.length === 0;
 
-      const result = this._generateFriendsMultiDigitAction(states, isFirst, steps);
+      // Решаем: пытаться ли сгенерировать Friends действие
+      const needMoreFriends = friendStepsCount < targetFriendSteps;
+      const tryFriend = needMoreFriends || (friendStepsCount >= minFriendSteps && Math.random() < 0.5);
 
-      if (!result) {
-        continue;
+      let action = null;
+
+      if (tryFriend) {
+        // Пытаемся сгенерировать Friends действие
+        action = this._tryGenerateFriendAction(states, isFirst);
       }
 
-      const { value, sign, digits, hasFriend } = result;
+      if (!action) {
+        // Если Friends не получилось, используем Simple действие
+        action = this._tryGenerateSimpleAction(states, isFirst, steps);
+      }
+
+      if (!action) {
+        continue; // Ничего не подошло, пробуем ещё раз
+      }
 
       // Применяем действие
-      const newStates = this._applyFriendsDigits(states, digits);
+      const newStates = this._applySingleDigitAction(states, action.value);
 
       if (!newStates) {
         continue;
       }
 
       // Проверяем валидность
-      let valid = true;
-      for (let i = 0; i < this.displayDigitCount; i++) {
-        if (newStates[i] < 0 || newStates[i] > 9) {
-          valid = false;
-          break;
-        }
-      }
-
-      if (!valid) {
+      if (!this._isValidState(newStates)) {
         continue;
       }
 
-      // 🔴 КРИТИЧНО: Проверка переполнения разрядности!
-      // По ТЗ: "Результат не выходит за пределы выбранной разрядности"
+      // Проверяем переполнение разрядности
       if (this._checkOverflow(newStates)) {
-        console.log(`  ⚠️ Переполнение разрядности! Пропускаем шаг.`);
         continue;
       }
 
-      // Проверка круглых чисел
-      if (this._isRoundNumber(value)) {
-        if (this.config._roundNumbersUsed >= this.config.maxRoundNumbersPerExample) {
-          continue;
-        }
-        if (Math.random() > this.config.roundNumberProbability) {
-          continue;
-        }
-        this.config._roundNumbersUsed++;
-      }
-
-      if (hasFriend) {
+      // Добавляем шаг
+      if (action.isFriend) {
         friendStepsCount++;
       }
 
-      const displayValue = sign * value;
-
       steps.push({
-        action: displayValue,
+        action: action.value,
         states: [...newStates],
-        digits: digits,
-        hasFriend: hasFriend
+        hasFriend: action.isFriend
       });
 
       states = newStates;
 
-      const signStr = displayValue >= 0 ? '+' : '';
-      console.log(`  ✅ Шаг ${steps.length}/${stepsCount}: ${signStr}${displayValue}${hasFriend ? ' (FRIEND!)' : ''}`);
+      const signStr = action.value >= 0 ? '+' : '';
+      console.log(`  ✅ Шаг ${steps.length}/${stepsCount}: ${signStr}${action.value}${action.isFriend ? ' (FRIEND!)' : ' (simple)'}`);
     }
 
-    // Перегенерация если нет Friend-шагов (с защитой от бесконечной рекурсии)
+    // Проверка: есть ли хотя бы 1 Friends действие?
     if (friendStepsCount === 0 && retryDepth < maxRetryDepth) {
-      console.warn(`⚠️ Нет Friend-шагов! Перегенерация... (попытка ${retryDepth + 1}/${maxRetryDepth})`);
+      console.warn(`⚠️ Нет Friends шагов! Перегенерация... (попытка ${retryDepth + 1}/${maxRetryDepth})`);
       return this._generateFriendsExample(retryDepth + 1);
     }
 
-    // Если так и не удалось сгенерировать Friend-шаги, выдаём предупреждение
     if (friendStepsCount === 0) {
-      console.error(`❌ Не удалось сгенерировать Friends пример с Friend-шагами за ${maxRetryDepth + 1} попыток!`);
-      console.error(`   Возможная причина: недостаточно разрядов (текущая разрядность: ${this.displayDigitCount})`);
-      console.error(`   Для правила Друзья требуется минимум 2 разряда!`);
+      console.error(`❌ Не удалось сгенерировать Friends пример после ${maxRetryDepth + 1} попыток!`);
     }
 
-    console.log(`✅ Friends пример готов: ${steps.length} шагов, ${friendStepsCount} Friend-переходов`);
+    console.log(`✅ Friends пример готов: ${steps.length} шагов, ${friendStepsCount} Friends переходов`);
 
     return {
       start: this.generateStartState(),
       steps,
       answer: [...states]
     };
+  }
+
+  /**
+   * 🆕 Попытка сгенерировать Friends действие
+   * Возвращает {value: number, isFriend: boolean} или null
+   */
+  _tryGenerateFriendAction(states, isFirst) {
+    const friendsDigits = this.baseRule.config.friendsDigits || [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const onlyAddition = this.baseRule.config.onlyAddition || false;
+    const onlySubtraction = this.baseRule.config.onlySubtraction || false;
+
+    // Пробуем каждую выбранную цифру в случайном порядке
+    const shuffled = [...friendsDigits].sort(() => Math.random() - 0.5);
+
+    for (const digit of shuffled) {
+      // Проверяем на первом разряде (position = 0) для всех разрядностей
+      const position = 0;
+      const currentValue = states[position];
+
+      // Пробуем +digit
+      if (!onlySubtraction && (isFirst || digit > 0)) {
+        if (this.baseRule.canApplyFriendAddition(digit, currentValue, states, position)) {
+          return {value: digit, isFriend: true};
+        }
+      }
+
+      // Пробуем -digit
+      if (!onlyAddition && !isFirst) {
+        if (this.baseRule.canApplyFriendSubtraction(digit, currentValue, states, position)) {
+          return {value: -digit, isFriend: true};
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * 🆕 Попытка сгенерировать Simple действие для подготовки/разнообразия
+   */
+  _tryGenerateSimpleAction(states, isFirst, previousSteps) {
+    const simpleDigits = this.baseRule.config.simpleBlockDigits || [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const position = 0;
+    const currentValue = states[position];
+
+    // Получаем доступные простые действия
+    const availableActions = [];
+
+    for (const digit of simpleDigits) {
+      // +digit
+      if (isFirst || digit > 0) {
+        if (this.baseRule._canPlusDirect(currentValue, digit)) {
+          availableActions.push(digit);
+        }
+      }
+
+      // -digit
+      if (!isFirst) {
+        if (this.baseRule._canMinusDirect(currentValue, digit)) {
+          availableActions.push(-digit);
+        }
+      }
+    }
+
+    if (availableActions.length === 0) {
+      return null;
+    }
+
+    // Выбираем случайное действие
+    const action = availableActions[Math.floor(Math.random() * availableActions.length)];
+
+    return {value: action, isFriend: false};
+  }
+
+  /**
+   * 🆕 Применить ОДНОЗНАЧНОЕ действие к многозначному числу
+   * value: +1, +2, -1, и т.д. (ОДНОЗНАЧНОЕ!)
+   * states: [4, 3, 0] (трёхзначное число 034)
+   */
+  _applySingleDigitAction(states, value) {
+    const newStates = [...states];
+    const position = 0; // Работаем с первым разрядом (единицы)
+
+    // Применяем действие через baseRule
+    const result = this.baseRule.applyAction(states[position], value, position, states);
+
+    if (result === null || result === undefined) {
+      return null;
+    }
+
+    // Если результат - массив (с переносом), обновляем все разряды
+    if (Array.isArray(result)) {
+      for (let i = 0; i < Math.min(result.length, newStates.length); i++) {
+        newStates[i] = result[i];
+      }
+    } else {
+      // Иначе обновляем только текущий разряд
+      newStates[position] = result;
+    }
+
+    return newStates;
+  }
+
+  /**
+   * Проверка валидности состояния
+   */
+  _isValidState(states) {
+    for (let i = 0; i < states.length; i++) {
+      if (states[i] < 0 || states[i] > 9) {
+        return false;
+      }
+    }
+    return true;
   }
 
   _generateFriendsMultiDigitAction(states, isFirst, previousSteps) {
