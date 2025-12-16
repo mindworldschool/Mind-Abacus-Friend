@@ -78,41 +78,43 @@ export class MultiDigitGenerator {
   }
 
   // ========== FRIENDS ГЕНЕРАЦИЯ ==========
-  
-  _generateFriendsExample() {
+
+  _generateFriendsExample(retryDepth = 0) {
+    const maxRetryDepth = 3; // Максимум 3 попытки регенерации
+
     let states = this.generateStartState();
     const stepsCount = this.generateStepsCount();
     const steps = [];
-    
-    console.log(`🤝 Генерация Friends примера: ${stepsCount} шагов, ${this.displayDigitCount} разрядов`);
-    
+
+    console.log(`🤝 Генерация Friends примера: ${stepsCount} шагов, ${this.displayDigitCount} разрядов (попытка ${retryDepth + 1}/${maxRetryDepth + 1})`);
+
     this.config._duplicatesUsed = 0;
     this.config._zeroDigitsUsed = 0;
     this.config._roundNumbersUsed = 0;
-    
+
     let attempts = 0;
     const maxAttempts = 1000;
     let friendStepsCount = 0;
-    
+
     while (steps.length < stepsCount && attempts < maxAttempts) {
       attempts++;
       const isFirst = steps.length === 0;
-      
+
       const result = this._generateFriendsMultiDigitAction(states, isFirst, steps);
-      
+
       if (!result) {
         continue;
       }
-      
+
       const { value, sign, digits, hasFriend } = result;
-      
+
       // Применяем действие
       const newStates = this._applyFriendsDigits(states, digits);
-      
+
       if (!newStates) {
         continue;
       }
-      
+
       // Проверяем валидность
       let valid = true;
       for (let i = 0; i < this.displayDigitCount; i++) {
@@ -121,18 +123,18 @@ export class MultiDigitGenerator {
           break;
         }
       }
-      
+
       if (!valid) {
         continue;
       }
-      
+
       // 🔴 КРИТИЧНО: Проверка переполнения разрядности!
       // По ТЗ: "Результат не выходит за пределы выбранной разрядности"
       if (this._checkOverflow(newStates)) {
         console.log(`  ⚠️ Переполнение разрядности! Пропускаем шаг.`);
         continue;
       }
-      
+
       // Проверка круглых чисел
       if (this._isRoundNumber(value)) {
         if (this.config._roundNumbersUsed >= this.config.maxRoundNumbersPerExample) {
@@ -143,34 +145,41 @@ export class MultiDigitGenerator {
         }
         this.config._roundNumbersUsed++;
       }
-      
+
       if (hasFriend) {
         friendStepsCount++;
       }
-      
+
       const displayValue = sign * value;
-      
+
       steps.push({
         action: displayValue,
         states: [...newStates],
         digits: digits,
         hasFriend: hasFriend
       });
-      
+
       states = newStates;
-      
+
       const signStr = displayValue >= 0 ? '+' : '';
       console.log(`  ✅ Шаг ${steps.length}/${stepsCount}: ${signStr}${displayValue}${hasFriend ? ' (FRIEND!)' : ''}`);
     }
-    
-    // Перегенерация если нет Friend-шагов
-    if (friendStepsCount === 0 && attempts < maxAttempts - 100) {
-      console.warn(`⚠️ Нет Friend-шагов! Перегенерация...`);
-      return this._generateFriendsExample();
+
+    // Перегенерация если нет Friend-шагов (с защитой от бесконечной рекурсии)
+    if (friendStepsCount === 0 && retryDepth < maxRetryDepth) {
+      console.warn(`⚠️ Нет Friend-шагов! Перегенерация... (попытка ${retryDepth + 1}/${maxRetryDepth})`);
+      return this._generateFriendsExample(retryDepth + 1);
     }
-    
+
+    // Если так и не удалось сгенерировать Friend-шаги, выдаём предупреждение
+    if (friendStepsCount === 0) {
+      console.error(`❌ Не удалось сгенерировать Friends пример с Friend-шагами за ${maxRetryDepth + 1} попыток!`);
+      console.error(`   Возможная причина: недостаточно разрядов (текущая разрядность: ${this.displayDigitCount})`);
+      console.error(`   Для правила Друзья требуется минимум 2 разряда!`);
+    }
+
     console.log(`✅ Friends пример готов: ${steps.length} шагов, ${friendStepsCount} Friend-переходов`);
-    
+
     return {
       start: this.generateStartState(),
       steps,
