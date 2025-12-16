@@ -10,20 +10,20 @@
 // Поддерживаемые правила:
 //  - UnifiedSimpleRule — "Просто" (без формул)
 //  - BrothersRule — "Братья" (формулы через 5)
-//  - FriendsRule — "Друзья" (формулы через 10)
+//  - FriendsExampleGenerator — "Друзья" (формулы через 10, специализированный генератор)
 //
 // Зависимости:
 //  - UnifiedSimpleRule — описывает допустимые шаги (+N / -N), физику абакуса,
 //    учитывает includeFive (Просто 4 / Просто 5), запрет первого минуса и т.д.
 //  - BrothersRule — переходы через 5 (+n = +5 - brother)
-//  - FriendsRule — переходы через 10 (+n = +10 - friend)
+//  - FriendsExampleGenerator — специализированный генератор для Друзья (+n = +10 - friend)
 //  - ExampleGenerator — строит саму цепочку шагов, опираясь на правило
 //  - MultiDigitGenerator — обёртка для многозначных чисел
 
 import { UnifiedSimpleRule } from "./rules/UnifiedSimpleRule.js";
 import { ExampleGenerator } from "./ExampleGenerator.js";
 import { BrothersRule } from "./rules/BrothersRule.js";
-import { FriendsRule } from "./rules/FriendsRule.js";
+import { FriendsExampleGenerator } from "./FriendsExampleGenerator.js";
 import { MultiDigitGenerator } from "./MultiDigitGenerator.js";
 
 /**
@@ -260,29 +260,41 @@ export function generateExample(settings = {}) {
     // === ОПРЕДЕЛЯЕМ БАЗОВЫЙ КЛАСС ПРАВИЛА ===
 
     if (friendsActive === true) {
-      // 🆕 ДРУЗЬЯ — переходы через 10
-      console.log("🤝 [generator] Базовое правило: ДРУЗЬЯ");
+      // 🆕 ДРУЗЬЯ — используем специализированный генератор
+      console.log("🤝 [generator] Специализированный генератор: ДРУЗЬЯ");
       console.log("   📌 Выбранные друзья:", friendsDigits);
       console.log("   📌 Только сложение:", blocks?.friends?.onlyAddition);
       console.log("   📌 Только вычитание:", blocks?.friends?.onlySubtraction);
-
-      RuleClass = FriendsRule;
 
       // Преобразуем строковые цифры в числа
       const selectedFriendsDigits = friendsDigits
         .map(d => parseInt(d, 10))
         .filter(n => n >= 1 && n <= 9);
 
-      ruleConfigForClass = {
-        selectedDigits: selectedFriendsDigits.length > 0 ? selectedFriendsDigits : [9],
-        onlyAddition: blocks?.friends?.onlyAddition ?? false,
-        onlySubtraction: blocks?.friends?.onlySubtraction ?? false,
+      // Определяем разрядность (минимум 2 для правила Друзья)
+      const friendsDigitCount = Math.max(2, digitCount);
+
+      // Создаём специализированный генератор
+      const friendsGenerator = new FriendsExampleGenerator({
+        selectedDigits: selectedFriendsDigits.length > 0 ? selectedFriendsDigits : [1],
+        digitCount: friendsDigitCount,
         minSteps: minSteps,
         maxSteps: maxSteps,
-        digitCount: 1, // Базовое правило всегда для 1 разряда
-        combineLevels: combineLevels,
+        onlyAddition: blocks?.friends?.onlyAddition ?? false,
+        onlySubtraction: blocks?.friends?.onlySubtraction ?? false,
         blocks: blocks
-      };
+      });
+
+      // Генерируем пример
+      const rawExample = friendsGenerator.generate();
+      const formatted = friendsGenerator.toTrainerFormat(rawExample);
+
+      console.log(
+        "✅ [generator] Friends пример готов:",
+        JSON.stringify(formatted, null, 2)
+      );
+
+      return formatted;
 
     } else if (brothersActive === true) {
       // БРАТЬЯ — переходы через 5
