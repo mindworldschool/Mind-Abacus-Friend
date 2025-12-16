@@ -320,16 +320,38 @@ export function generateExample(settings = {}) {
     }
 
     // === ВЫБИРАЕМ ОДНОРАЗРЯДНОЕ ИЛИ МНОГОРАЗРЯДНОЕ ===
-    if (digitCount > 1) {
-      console.log(`🔢 [generator] Режим МНОГОРАЗРЯДНЫЙ (${digitCount} разрядов)`);
-      console.log(`   📌 Переменная разрядность: ${combineLevels}`);
+
+    // 🔴 СПЕЦИАЛЬНАЯ ЛОГИКА ДЛЯ ДРУЗЕЙ:
+    // Правило Друзья ВСЕГДА требует минимум 2 разряда для СОСТОЯНИЯ абакуса,
+    // потому что формула +n = +10 - friend использует следующий разряд.
+    //
+    // НО: digitCount из UI определяет какие ДЕЙСТВИЯ генерировать:
+    // - digitCount=1 → действия +1, +2, +3 (однозначные)
+    // - digitCount=2 → действия +1, +14, +23 (одно- и двузначные)
+    //
+    // Поэтому для Друзей:
+    // - Внутренняя разрядность STATE = max(digitCount, 2)
+    // - Разрядность ДЕЙСТВИЙ = digitCount (контролируется в MultiDigitGenerator)
+
+    const effectiveDigitCount = (friendsActive && digitCount === 1) ? 2 : digitCount;
+
+    if (effectiveDigitCount > 1 || friendsActive) {
+      if (friendsActive && digitCount === 1) {
+        console.log(`🔢 [generator] Режим ОДНОРАЗРЯДНЫЕ ДЕЙСТВИЯ для Друзья`);
+        console.log(`   📌 Действия: однозначные (+1, +2, +3)`);
+        console.log(`   📌 Состояние абакуса: 2 разряда (для формулы +10-friend)`);
+      } else {
+        console.log(`🔢 [generator] Режим МНОГОРАЗРЯДНЫЙ (${effectiveDigitCount} разрядов)`);
+        console.log(`   📌 Переменная разрядность: ${combineLevels}`);
+      }
 
       // Многоразрядный режим - используем MultiDigitGenerator
-      rule = new MultiDigitGenerator(RuleClass, digitCount, {
+      rule = new MultiDigitGenerator(RuleClass, effectiveDigitCount, {
         ...ruleConfigForClass,
         variableDigitCounts: combineLevels, // Переключатель из UI
         minSteps: minSteps,
-        maxSteps: maxSteps
+        maxSteps: maxSteps,
+        originalDigitCount: digitCount // Сохраняем оригинальную разрядность для контроля действий
       });
     } else {
       console.log("🔤 [generator] Режим ОДНОРАЗРЯДНЫЙ");
