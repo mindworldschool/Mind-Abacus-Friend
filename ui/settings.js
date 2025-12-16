@@ -341,12 +341,51 @@ export function renderSettings(container, { t, state, updateSettings, navigate }
   baseGrid.appendChild(modeRow.row);
 
   const digitsRow = createFormRow(t("settings.digitsLabel"));
-  digitsRow.control.appendChild(
-    createSelect(t("settings.digitsOptions"), settingsState.digits, (value) => {
-      updateSettings({ digits: value });
-    })
-  );
+
+  // Функция для обновления опций разрядности в зависимости от блока Друзья
+  function getDigitsOptions() {
+    const allOptions = t("settings.digitsOptions");
+    const friendsActive = state.settings.blocks?.friends?.digits?.length > 0;
+
+    // Если блок Друзья активен, убираем опцию "1 разряд"
+    if (friendsActive) {
+      return allOptions.filter(opt => opt.value !== "1");
+    }
+    return allOptions;
+  }
+
+  // Создаём select с фильтрованными опциями
+  const digitsSelect = createSelect(getDigitsOptions(), settingsState.digits, (value) => {
+    updateSettings({ digits: value });
+  });
+
+  digitsRow.control.appendChild(digitsSelect);
   baseGrid.appendChild(digitsRow.row);
+
+  // Функция для обновления доступных опций
+  function updateDigitsSelect() {
+    const friendsActive = state.settings.blocks?.friends?.digits?.length > 0;
+    const currentValue = state.settings.digits;
+
+    // Пересоздаём опции
+    digitsSelect.innerHTML = '';
+    const options = getDigitsOptions();
+
+    options.forEach((option) => {
+      const opt = document.createElement("option");
+      opt.value = option.value;
+      opt.textContent = option.label;
+      digitsSelect.appendChild(opt);
+    });
+
+    // Если Друзья активны и выбран 1 разряд, автоматически переключаем на 2
+    if (friendsActive && currentValue === "1") {
+      digitsSelect.value = "2";
+      updateSettings({ digits: "2" });
+    } else {
+      digitsSelect.value = currentValue;
+    }
+  }
 
   const combineRow = createFormRow(t("settings.combineLabel"));
   combineRow.control.appendChild(
@@ -473,6 +512,11 @@ export function renderSettings(container, { t, state, updateSettings, navigate }
             }
           }
         });
+
+        // Обновляем доступные опции разрядности при изменении блока Друзья
+        if (key === "friends" && changes.digits !== undefined) {
+          updateDigitsSelect();
+        }
       }
     });
 
