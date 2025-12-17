@@ -1031,143 +1031,241 @@ export class FriendsExampleGenerator {
 
   /**
    * Минимальный fallback-пример если генерация не удалась
+   *
+   * НОВАЯ СТРАТЕГИЯ:
+   * 1. Подбираем friendDigit совместимый с brothersActive
+   * 2. ПРЯМАЯ подготовка целевого разряда к нужному состоянию
+   * 3. Применяем Friends действие (гарантированно минимум 1)
+   * 4. Заполняем оставшиеся шаги разнообразными простыми действиями
+   * 5. Гарантируем РОВНО targetSteps шагов
    */
   _fallbackExample() {
     const steps = [];
     let states = Array(this.config.digitCount).fill(0);
     const targetSteps = this.config.stepsCount;
 
-    console.log(`⚠️ Используем fallback генерацию для ${targetSteps} шагов`);
+    console.log(`⚠️ Используем fallback генерацию для ${targetSteps} шагов (brothersActive=${this.config.brothersActive})`);
 
-    // Стратегия: подготавливаем целевой разряд и применяем Friends
+    let friendDigit = null;
+    let requiredTargetVal = null;
+
+    // Подбираем friendDigit и состояние, совместимые с brothersActive
+    if (this.config.brothersActive) {
+      // С активными Братьями можем использовать любую цифру
+      friendDigit = this.config.selectedDigits[0] || 1;
+      const requirements = this._getAdditionRequirements(friendDigit);
+      requiredTargetVal = requirements.states[0];
+    } else {
+      // Без Братьев нужна цифра, которая не требует изменения верхней бусины
+      // Лучший вариант: friendDigit=9 (friend=1), подготовка state=1,2,3,4
+      // Формула: +9 = +10 - 1, вычитание 1 из 1-4 не меняет верхнюю бусину
+
+      const compatibleDigits = [];
+
+      for (const digit of this.config.selectedDigits) {
+        const friend = 10 - digit;
+        const requirements = this._getAdditionRequirements(digit);
+
+        // Проверяем: есть ли состояния без верхней бусины (0-4)?
+        const statesWithoutUpperBead = requirements.states.filter(s => s < 5);
+
+        if (statesWithoutUpperBead.length > 0) {
+          // Проверяем: можем ли вычесть friend из этих состояний?
+          for (const state of statesWithoutUpperBead) {
+            if (state >= friend && this._canMinusDirect(state, friend)) {
+              compatibleDigits.push({ digit, state });
+              break;
+            }
+          }
+        }
+      }
+
+      if (compatibleDigits.length > 0) {
+        // Берем первую совместимую комбинацию
+        friendDigit = compatibleDigits[0].digit;
+        requiredTargetVal = compatibleDigits[0].state;
+        console.log(`🔍 Выбран friendDigit=${friendDigit}, целевое состояние=${requiredTargetVal} (без Братьев)`);
+      } else {
+        // Если не нашли совместимых - все равно пробуем первую цифру
+        console.warn(`⚠️ Не найдены совместимые friendDigits для brothersActive=false, используем первую`);
+        friendDigit = this.config.selectedDigits[0] || 9;
+        requiredTargetVal = 1; // Пробуем минимальное состояние
+      }
+    }
+
     let friendsAdded = 0;
-    const minFriends = Math.max(1, Math.floor(targetSteps * 0.3));
-    const friendDigit = this.config.selectedDigits[0] || 1;
+    const minFriends = 1;
 
-    // Получаем требования для Friends
-    const requirements = this._getAdditionRequirements(friendDigit);
-    const targetState = requirements.minState; // Нужное состояние целевого разряда
+    // ШАГ 1: Подготовка целевого разряда (если требуется и есть место для шагов)
+    const currentTargetVal = states[this.targetPosition] || 0;
 
-    for (let i = 0; i < targetSteps; i++) {
+    if (currentTargetVal < requiredTargetVal && steps.length < targetSteps - 1) {
+      // Добавляем ПРЯМО к целевому разряду
+      const needToAdd = requiredTargetVal - currentTargetVal;
+      const valueToAdd = needToAdd * Math.pow(10, this.targetPosition);
+
+      const newStates = this._applyAction(states, { value: valueToAdd, isFriend: false });
+
+      if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+        steps.push({
+          action: valueToAdd,
+          isFriend: false,
+          states: [...newStates]
+        });
+        states = newStates;
+        console.log(`🔧 Подготовка: добавили ${valueToAdd} к целевому разряду, состояние: [${newStates.join(', ')}]`);
+      }
+    }
+
+    // ШАГ 2: Применяем Friends действие (обязательно!)
+    if (friendsAdded < minFriends && steps.length < targetSteps) {
       const currentTargetVal = states[this.targetPosition] || 0;
-      const needFriend = friendsAdded < minFriends;
-      const canFriend = requirements.states.includes(currentTargetVal);
+      const friend = 10 - friendDigit;
 
-      // Пытаемся применить Friends если нужно и возможно
-      if (needFriend && canFriend && (targetSteps - i) >= 1) {
-        const friend = 10 - friendDigit;
+      if (currentTargetVal === requiredTargetVal && this._canMinusDirect(currentTargetVal, friend)) {
+        const value = friendDigit * Math.pow(10, this.targetPosition);
+        const newStates = this._applyAction(states, { value, isFriend: true });
 
-        // Проверяем что можем вычесть friend из целевого разряда
-        if (this._canMinusDirect(currentTargetVal, friend)) {
-          // Создаем Friends действие
-          const actionDigits = Array(this.config.digitCount).fill(0);
-          actionDigits[this.targetPosition] = friendDigit;
+        if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+          steps.push({
+            action: value,
+            isFriend: true,
+            friendN: friendDigit,
+            formula: this._buildFormula(value, this.targetPosition),
+            states: [...newStates]
+          });
+          states = newStates;
+          friendsAdded++;
+          console.log(`✅ Friends добавлен: ${value}, состояние: [${newStates.join(', ')}]`);
+        } else {
+          console.warn(`⚠️ Не удалось применить Friends action ${value} к состоянию [${states.join(', ')}]`);
+        }
+      } else {
+        console.warn(`⚠️ Не удалось проверить Friends: currentTargetVal=${currentTargetVal}, requiredTargetVal=${requiredTargetVal}, canMinus=${this._canMinusDirect(currentTargetVal, friend)}`);
+      }
+    }
 
-          const value = this._digitsToNumber(actionDigits);
-          const newStates = this._applyAction(states, { value, isFriend: true });
+    // ШАГ 3: Заполняем оставшиеся шаги РАЗНООБРАЗНЫМИ простыми действиями
+    const simpleActions = [1, 2, 3, 4, 1, 2]; // Чередование для разнообразия
+    let actionIndex = 0;
+    let failedAttempts = 0;
+    const maxFailedAttempts = 50;
 
-          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+    while (steps.length < targetSteps && failedAttempts < maxFailedAttempts) {
+      const firstVal = states[0] || 0;
+      const val = simpleActions[actionIndex % simpleActions.length];
+
+      // Пробуем добавить к единицам
+      if (firstVal + val <= 9 && this._canPlusDirect(firstVal, val)) {
+        const newStates = this._applyAction(states, { value: val, isFriend: false });
+
+        if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+          steps.push({
+            action: val,
+            isFriend: false,
+            states: [...newStates]
+          });
+          states = newStates;
+          actionIndex++;
+          failedAttempts = 0;
+          continue;
+        }
+      }
+
+      // Если не можем добавить - пробуем вычитание
+      if (firstVal > 0 && firstVal >= val && this._canMinusDirect(firstVal, val)) {
+        const newStates = this._applyAction(states, { value: -val, isFriend: false });
+
+        if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+          steps.push({
+            action: -val,
+            isFriend: false,
+            states: [...newStates]
+          });
+          states = newStates;
+          actionIndex++;
+          failedAttempts = 0;
+          continue;
+        }
+      }
+
+      // Если единицы "застряли" - пробуем другой разряд (для трех+ значных)
+      if (this.config.digitCount > 2) {
+        const pos = 1; // Следующий разряд после единиц (НЕ целевой для digitCount > 2)
+        const posVal = states[pos] || 0;
+
+        if (posVal + val <= 9) {
+          const valueToAdd = val * Math.pow(10, pos);
+          const newStates = [...states];
+          newStates[pos] += val;
+
+          if (this._isValidState(newStates) && !this._checkOverflow(newStates)) {
             steps.push({
-              action: value,
-              isFriend: true,
-              friendN: friendDigit,
-              formula: this._buildFormula(value, this.targetPosition),
+              action: valueToAdd,
+              isFriend: false,
               states: [...newStates]
             });
             states = newStates;
-            friendsAdded++;
+            actionIndex++;
+            failedAttempts = 0;
             continue;
           }
         }
       }
 
-      // Простое действие: подготовка или заполнение
-      // Если нужно подготовить целевой разряд
-      if (needFriend && currentTargetVal < targetState && (targetSteps - i) >= 2) {
-        // Добавляем к целевому разряду
-        const actionDigits = Array(this.config.digitCount).fill(0);
-        const addAmount = Math.min(4, targetState - currentTargetVal); // Максимум +4 за раз
-        actionDigits[this.targetPosition] = addAmount;
+      // Последняя попытка: +1 если возможно
+      if (firstVal < 9) {
+        const newStates = [...states];
+        newStates[0]++;
 
-        const value = this._digitsToNumber(actionDigits);
-        const newStates = this._applyAction(states, { value, isFriend: false });
-
-        if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+        if (this._isValidState(newStates)) {
           steps.push({
-            action: value,
+            action: 1,
             isFriend: false,
             states: [...newStates]
           });
           states = newStates;
+          actionIndex++;
+          failedAttempts = 0;
           continue;
         }
       }
 
-      // Обычное простое действие к первому разряду
+      // Не смогли добавить - пробуем другое действие
+      actionIndex++;
+      failedAttempts++;
+    }
+
+    // Если не хватает Friends, это критическая ошибка
+    if (friendsAdded === 0) {
+      console.error(`❌ КРИТИЧНО: Fallback не смог сгенерировать ни одного Friends действия!`);
+    }
+
+    // Обрезаем или дополняем до точного количества
+    const finalSteps = steps.slice(0, targetSteps);
+
+    // Если не хватает шагов - дополняем простыми +1
+    while (finalSteps.length < targetSteps) {
       const firstVal = states[0] || 0;
-      let added = false;
-
-      // Пробуем +1, +2, +3, +4
-      for (const val of [1, 2, 3, 4]) {
-        if (this._canPlusDirect(firstVal, val)) {
-          const actionDigits = Array(this.config.digitCount).fill(0);
-          actionDigits[0] = val;
-
-          const value = this._digitsToNumber(actionDigits);
-          const newStates = this._applyAction(states, { value, isFriend: false });
-
-          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
-            steps.push({
-              action: value,
-              isFriend: false,
-              states: [...newStates]
-            });
-            states = newStates;
-            added = true;
-            break;
-          }
-        }
-      }
-
-      if (!added) {
-        // Пробуем добавить к любому разряду
-        for (let pos = 0; pos < this.config.digitCount; pos++) {
-          const posVal = states[pos] || 0;
-          for (const val of [1, 2, 3, 4]) {
-            if (this._canPlusDirect(posVal, val)) {
-              const actionDigits = Array(this.config.digitCount).fill(0);
-              actionDigits[pos] = val;
-
-              const value = this._digitsToNumber(actionDigits);
-              const newStates = this._applyAction(states, { value, isFriend: false });
-
-              if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
-                steps.push({
-                  action: value,
-                  isFriend: false,
-                  states: [...newStates]
-                });
-                states = newStates;
-                added = true;
-                break;
-              }
-            }
-          }
-          if (added) break;
-        }
-      }
-
-      // Если всё еще не добавили - пропускаем
-      if (!added) {
-        console.warn(`⚠️ Fallback: не смогли добавить шаг ${i + 1}`);
-        continue;
+      if (firstVal < 9) {
+        states = [...states];
+        states[0]++;
+        finalSteps.push({
+          action: 1,
+          isFriend: false,
+          states: [...states]
+        });
+      } else {
+        break;
       }
     }
 
+    console.log(`📊 Fallback результат: ${finalSteps.length} шагов, ${friendsAdded} Friends`);
+
     return {
       start: Array(this.config.digitCount).fill(0),
-      steps,
-      answer: [...states]
+      steps: finalSteps,
+      answer: finalSteps.length > 0 ? [...finalSteps[finalSteps.length - 1].states] : Array(this.config.digitCount).fill(0)
     };
   }
 
