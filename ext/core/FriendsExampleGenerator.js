@@ -1093,8 +1093,45 @@ export class FriendsExampleGenerator {
         }
 
         if (!added) {
-          console.warn(`⚠️ Не можем подготовить единицы (добавление): текущее=${currentFirst}, нужно=${requiredFirstVal}`);
-          break;
+          // Прямой путь невозможен - пробуем ОБХОДНОЙ путь через 9
+          console.warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${requiredFirstVal}. Пробуем через 9...`);
+
+          // Путь: current → 9 → required
+          const toNine = 9 - currentFirst;
+          if (toNine > 0 && this._canPlusDirect(currentFirst, toNine) && steps.length < targetSteps - 2) {
+            // Шаг 1: current → 9
+            const newStates1 = this._applyAction(states, { value: toNine, isFriend: false });
+            if (newStates1 && this._isValidState(newStates1)) {
+              steps.push({
+                action: toNine,
+                isFriend: false,
+                states: [...newStates1]
+              });
+              states = newStates1;
+              console.log(`🔄 Обходной путь (шаг 1): +${toNine} → 9, состояние: [${newStates1.join(', ')}]`);
+
+              // Шаг 2: 9 → required
+              const fromNine = 9 - requiredFirstVal;
+              if (fromNine > 0 && this._canMinusDirect(9, fromNine)) {
+                const newStates2 = this._applyAction(states, { value: -fromNine, isFriend: false });
+                if (newStates2 && this._isValidState(newStates2)) {
+                  steps.push({
+                    action: -fromNine,
+                    isFriend: false,
+                    states: [...newStates2]
+                  });
+                  states = newStates2;
+                  added = true;
+                  console.log(`🔄 Обходной путь (шаг 2): -${fromNine} → ${requiredFirstVal}, состояние: [${newStates2.join(', ')}]`);
+                }
+              }
+            }
+          }
+
+          if (!added) {
+            console.error(`❌ Невозможно подготовить единицы: ${currentFirst}→${requiredFirstVal}`);
+            break;
+          }
         }
       }
       // Если нужно УБРАТЬ
@@ -1125,8 +1162,43 @@ export class FriendsExampleGenerator {
         }
 
         if (!removed) {
-          console.warn(`⚠️ Не можем подготовить единицы (вычитание): текущее=${currentFirst}, нужно=${requiredFirstVal}`);
-          break;
+          // Прямой путь невозможен - пробуем ОБХОДНОЙ путь через 0
+          console.warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${requiredFirstVal}. Пробуем через 0...`);
+
+          // Путь: current → 0 → required
+          if (currentFirst > 0 && this._canMinusDirect(currentFirst, currentFirst) && steps.length < targetSteps - 2) {
+            // Шаг 1: current → 0
+            const newStates1 = this._applyAction(states, { value: -currentFirst, isFriend: false });
+            if (newStates1 && this._isValidState(newStates1)) {
+              steps.push({
+                action: -currentFirst,
+                isFriend: false,
+                states: [...newStates1]
+              });
+              states = newStates1;
+              console.log(`🔄 Обходной путь (шаг 1): -${currentFirst} → 0, состояние: [${newStates1.join(', ')}]`);
+
+              // Шаг 2: 0 → required
+              if (requiredFirstVal > 0 && this._canPlusDirect(0, requiredFirstVal)) {
+                const newStates2 = this._applyAction(states, { value: requiredFirstVal, isFriend: false });
+                if (newStates2 && this._isValidState(newStates2)) {
+                  steps.push({
+                    action: requiredFirstVal,
+                    isFriend: false,
+                    states: [...newStates2]
+                  });
+                  states = newStates2;
+                  removed = true;
+                  console.log(`🔄 Обходной путь (шаг 2): +${requiredFirstVal} → ${requiredFirstVal}, состояние: [${newStates2.join(', ')}]`);
+                }
+              }
+            }
+          }
+
+          if (!removed) {
+            console.error(`❌ Невозможно подготовить единицы: ${currentFirst}→${requiredFirstVal}`);
+            break;
+          }
         }
       }
     }
