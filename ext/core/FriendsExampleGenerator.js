@@ -151,11 +151,6 @@ export class FriendsExampleGenerator {
     const U2 = this._U(targetV);
     const L2 = this._L(targetV);
 
-    // Если Братья НЕ активны → верхняя бусина НЕ может меняться
-    if (!this.config.brothersActive && U2 !== U1) {
-      return false;
-    }
-
     // Изменения бусин
     const topChange = U2 - U1;  // -1, 0, или +1
     const botChange = L2 - L1;  // -4..+4
@@ -195,11 +190,6 @@ export class FriendsExampleGenerator {
     const L1 = this._L(v);
     const U2 = this._U(targetV);
     const L2 = this._L(targetV);
-
-    // Если Братья НЕ активны → верхняя бусина НЕ может меняться
-    if (!this.config.brothersActive && U2 !== U1) {
-      return false;
-    }
 
     // Изменения бусин
     const topChange = U2 - U1;  // -1, 0, или +1
