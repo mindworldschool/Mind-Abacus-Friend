@@ -1096,52 +1096,92 @@ export class FriendsExampleGenerator {
     let friendsAdded = 0;
     const minFriends = 1;
 
-    // ШАГ 1: Подготовка целевого разряда (если требуется и есть место для шагов)
-    const currentTargetVal = states[this.targetPosition] || 0;
+    // ШАГ 1: Подготавливаем ЕДИНИЦЫ для применения Friends (ОДНОЗНАЧНОЕ действие!)
+    // Для friendDigit нужно состояние единиц где Friends сработает
+    const requiredFirstVal = 10 - friendDigit; // Например, для digit=1 нужно 9, для digit=9 нужно 1
 
-    if (currentTargetVal < requiredTargetVal && steps.length < targetSteps - 1) {
-      // Добавляем ПРЯМО к целевому разряду
-      const needToAdd = requiredTargetVal - currentTargetVal;
-      const valueToAdd = needToAdd * Math.pow(10, this.targetPosition);
+    if (friendsAdded < minFriends && steps.length < targetSteps - 1) {
+      // Подготавливаем единицы к нужному состоянию маленькими шагами
+      let maxIterations = 20; // Защита от бесконечного цикла
+      while ((states[0] || 0) < requiredFirstVal && steps.length < targetSteps - 1 && maxIterations-- > 0) {
+        const currentFirst = states[0] || 0;
+        const remaining = requiredFirstVal - currentFirst;
 
-      const newStates = this._applyAction(states, { value: valueToAdd, isFriend: false });
+        // Пробуем добавить максимально возможное: 4, 3, 2, 1
+        let added = false;
+        for (let tryAdd of [Math.min(4, remaining), 3, 2, 1]) {
+          if (tryAdd <= 0 || tryAdd > remaining) continue;
+          if (currentFirst + tryAdd > 9) continue; // Переполнение
 
-      if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
-        steps.push({
-          action: valueToAdd,
-          isFriend: false,
-          states: [...newStates]
-        });
-        states = newStates;
-        console.log(`🔧 Подготовка: добавили ${valueToAdd} к целевому разряду, состояние: [${newStates.join(', ')}]`);
+          // При brothersActive=true можем использовать любые переходы (включая Братья)
+          // При brothersActive=false только правило Просто
+          const canAdd = this.config.brothersActive || this._canPlusDirect(currentFirst, tryAdd);
+
+          if (canAdd) {
+            const newStates = this._applyAction(states, { value: tryAdd, isFriend: false });
+
+            if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+              steps.push({
+                action: tryAdd,
+                isFriend: false,
+                states: [...newStates]
+              });
+              states = newStates;
+              added = true;
+              break;
+            }
+          }
+        }
+
+        if (!added) {
+          console.warn(`⚠️ Не можем подготовить единицы: текущее=${currentFirst}, нужно=${requiredFirstVal}`);
+          break;
+        }
       }
+
+      console.log(`🔧 Подготовка единиц для Friends: единицы = ${states[0]}, нужно = ${requiredFirstVal}`);
     }
 
-    // ШАГ 2: Применяем Friends действие (обязательно!)
+    // ШАГ 2: Применяем Friends действие (ОДНОЗНАЧНОЕ!) ВРУЧНУЮ к ЕДИНИЦАМ
     if (friendsAdded < minFriends && steps.length < targetSteps) {
-      const currentTargetVal = states[this.targetPosition] || 0;
-      const friend = 10 - friendDigit;
+      const currentFirst = states[0] || 0;
 
-      if (currentTargetVal === requiredTargetVal && this._canMinusDirect(currentTargetVal, friend)) {
-        const value = friendDigit * Math.pow(10, this.targetPosition);
-        const newStates = this._applyAction(states, { value, isFriend: true });
+      if (currentFirst === requiredFirstVal) {
+        // Проверяем: можем ли применить Friends формулу?
+        const friend = 10 - friendDigit;
+        const canMinus = this.config.brothersActive || this._canMinusDirect(currentFirst, friend);
 
-        if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
-          steps.push({
-            action: value,
-            isFriend: true,
-            friendN: friendDigit,
-            formula: this._buildFormula(value, this.targetPosition),
-            states: [...newStates]
-          });
-          states = newStates;
-          friendsAdded++;
-          console.log(`✅ Friends добавлен: ${value}, состояние: [${newStates.join(', ')}]`);
+        if (canMinus) {
+          // Применяем Friends ВРУЧНУЮ к единицам: +friendDigit = +10 - friend
+          const newStates = [...states];
+
+          // Формула: +n = +10 - friend
+          // 1. Добавляем перенос в следующий разряд (десятки)
+          if (newStates.length < 2) newStates.push(0);
+          newStates[1] = (newStates[1] || 0) + 1;
+
+          // 2. Вычитаем friend из единиц
+          newStates[0] = (newStates[0] || 0) - friend;
+
+          if (this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+            steps.push({
+              action: friendDigit,
+              isFriend: true,
+              friendN: friendDigit,
+              formula: this._buildFormula(friendDigit, 0), // К единицам!
+              states: [...newStates]
+            });
+            states = newStates;
+            friendsAdded++;
+            console.log(`✅ Friends добавлен: +${friendDigit} (однозначное!), формула: +10 - ${friend}, состояние: [${newStates.join(', ')}]`);
+          } else {
+            console.warn(`⚠️ Невалидное состояние после Friends: [${newStates.join(', ')}]`);
+          }
         } else {
-          console.warn(`⚠️ Не удалось применить Friends action ${value} к состоянию [${states.join(', ')}]`);
+          console.warn(`⚠️ Не можем вычесть friend=${friend} из состояния ${currentFirst} (brothersActive=${this.config.brothersActive})`);
         }
       } else {
-        console.warn(`⚠️ Не удалось проверить Friends: currentTargetVal=${currentTargetVal}, requiredTargetVal=${requiredTargetVal}, canMinus=${this._canMinusDirect(currentTargetVal, friend)}`);
+        console.warn(`⚠️ Единицы не подготовлены: текущее=${currentFirst}, нужно=${requiredFirstVal}`);
       }
     }
 
