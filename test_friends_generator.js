@@ -14,7 +14,11 @@ const gen1 = new FriendsExampleGenerator({
   selectedDigits: [1],
   digitCount: 2,
   stepsCount: 7,
-  brothersActive: false
+  blocks: {
+    brothers: {
+      active: false
+    }
+  }
 });
 
 const example1 = gen1.generate();
@@ -33,7 +37,11 @@ const gen2 = new FriendsExampleGenerator({
   selectedDigits: [1],
   digitCount: 2,
   stepsCount: 10,
-  brothersActive: false
+  blocks: {
+    brothers: {
+      active: false
+    }
+  }
 });
 
 const example2 = gen2.generate();
@@ -52,7 +60,11 @@ const gen3 = new FriendsExampleGenerator({
   selectedDigits: [1, 2, 3],
   digitCount: 2,
   stepsCount: 10,
-  brothersActive: false
+  blocks: {
+    brothers: {
+      active: false
+    }
+  }
 });
 
 const example3 = gen3.generate();
@@ -76,7 +88,11 @@ const gen4 = new FriendsExampleGenerator({
   selectedDigits: [1],
   digitCount: 3,
   stepsCount: 7,
-  brothersActive: false
+  blocks: {
+    brothers: {
+      active: false
+    }
+  }
 });
 
 const example4 = gen4.generate();
@@ -95,7 +111,11 @@ const gen5 = new FriendsExampleGenerator({
   selectedDigits: [1],
   digitCount: 2,
   stepsCount: 7,
-  brothersActive: true
+  blocks: {
+    brothers: {
+      active: true
+    }
+  }
 });
 
 const example5 = gen5.generate();
@@ -114,7 +134,11 @@ const gen6 = new FriendsExampleGenerator({
   selectedDigits: [1, 2],
   digitCount: 2,
   stepsCount: 50,
-  brothersActive: false
+  blocks: {
+    brothers: {
+      active: false
+    }
+  }
 });
 
 const example6 = gen6.generate();

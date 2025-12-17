@@ -1,18 +1,18 @@
-// Простой тест для fallback
+// Тест для brothersActive = false с совместимыми цифрами
 
 import { FriendsExampleGenerator } from './ext/core/FriendsExampleGenerator.js';
 
 console.log('='.repeat(80));
-console.log('ПРОСТОЙ ТЕСТ: brothersActive = true');
+console.log('ТЕСТ: brothersActive = false, friendDigit = 9 (совместимая цифра)');
 console.log('='.repeat(80));
 
 const gen = new FriendsExampleGenerator({
-  selectedDigits: [1],
+  selectedDigits: [9],  // Цифра 9 совместима с brothersActive=false
   digitCount: 2,
   stepsCount: 7,
   blocks: {
     brothers: {
-      active: true  // ВАЖНО: включаем Братья!
+      active: false
     }
   }
 });
@@ -26,6 +26,18 @@ if (example) {
   const friendSteps = example.steps.filter(s => s.isFriend);
   console.log(`\n📊 Всего шагов: ${example.steps.length}`);
   console.log(`🤝 Шагов Friends: ${friendSteps.length}`);
+
+  // Проверяем правильность примера
+  let sum = 0;
+  for (const step of formatted.steps) {
+    if (typeof step === 'string') {
+      sum += parseInt(step);
+    } else {
+      sum += parseInt(step.step);
+    }
+  }
+  console.log(`🧮 Проверка: сумма действий = ${sum}, ответ = ${formatted.answer}`);
+  console.log(sum === formatted.answer ? '✅ Проверка прошла' : '❌ Ошибка в вычислениях');
 } else {
   console.error('❌ Не удалось сгенерировать пример');
 }
