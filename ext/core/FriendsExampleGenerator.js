@@ -151,11 +151,6 @@ export class FriendsExampleGenerator {
     const U2 = this._U(targetV);
     const L2 = this._L(targetV);
 
-    // Если Братья НЕ активны → верхняя бусина НЕ может меняться
-    if (!this.config.brothersActive && U2 !== U1) {
-      return false;
-    }
-
     // Изменения бусин
     const topChange = U2 - U1;  // -1, 0, или +1
     const botChange = L2 - L1;  // -4..+4
@@ -195,11 +190,6 @@ export class FriendsExampleGenerator {
     const L1 = this._L(v);
     const U2 = this._U(targetV);
     const L2 = this._L(targetV);
-
-    // Если Братья НЕ активны → верхняя бусина НЕ может меняться
-    if (!this.config.brothersActive && U2 !== U1) {
-      return false;
-    }
 
     // Изменения бусин
     const topChange = U2 - U1;  // -1, 0, или +1
@@ -1072,37 +1062,72 @@ export class FriendsExampleGenerator {
 
     // ШАГ 2: АГРЕССИВНО подготавливаем единицы к нужному состоянию
     let maxIterations = 20;
-    while ((states[0] || 0) < requiredFirstVal && steps.length < targetSteps - 1 && maxIterations-- > 0) {
+    while ((states[0] || 0) !== requiredFirstVal && steps.length < targetSteps - 1 && maxIterations-- > 0) {
       const currentFirst = states[0] || 0;
-      const remaining = requiredFirstVal - currentFirst;
 
-      // Пробуем добавить МАКСИМАЛЬНО ВОЗМОЖНОЕ: 9, 8, 7, 6, 5, 4, 3, 2, 1
-      // Это позволит быстро достичь нужного состояния
-      let added = false;
-      for (let tryAdd = Math.min(9, remaining); tryAdd >= 1; tryAdd--) {
-        if (currentFirst + tryAdd > 9) continue; // Переполнение
+      // Если нужно ДОБАВИТЬ
+      if (currentFirst < requiredFirstVal) {
+        const remaining = requiredFirstVal - currentFirst;
 
-        // Проверяем: можем ли добавить по правилу Просто?
-        if (this._canPlusDirect(currentFirst, tryAdd)) {
-          const newStates = this._applyAction(states, { value: tryAdd, isFriend: false });
+        // Пробуем добавить МАКСИМАЛЬНО ВОЗМОЖНОЕ: 9, 8, 7, 6, 5, 4, 3, 2, 1
+        let added = false;
+        for (let tryAdd = Math.min(9, remaining); tryAdd >= 1; tryAdd--) {
+          if (currentFirst + tryAdd > 9) continue; // Переполнение
 
-          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
-            steps.push({
-              action: tryAdd,
-              isFriend: false,
-              states: [...newStates]
-            });
-            states = newStates;
-            added = true;
-            console.log(`➕ Подготовка: +${tryAdd}, состояние: [${newStates.join(', ')}]`);
-            break;
+          // Проверяем: можем ли добавить по правилу Просто?
+          if (this._canPlusDirect(currentFirst, tryAdd)) {
+            const newStates = this._applyAction(states, { value: tryAdd, isFriend: false });
+
+            if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+              steps.push({
+                action: tryAdd,
+                isFriend: false,
+                states: [...newStates]
+              });
+              states = newStates;
+              added = true;
+              console.log(`➕ Подготовка: +${tryAdd}, состояние: [${newStates.join(', ')}]`);
+              break;
+            }
           }
         }
-      }
 
-      if (!added) {
-        console.warn(`⚠️ Не можем подготовить единицы: текущее=${currentFirst}, нужно=${requiredFirstVal}`);
-        break;
+        if (!added) {
+          console.warn(`⚠️ Не можем подготовить единицы (добавление): текущее=${currentFirst}, нужно=${requiredFirstVal}`);
+          break;
+        }
+      }
+      // Если нужно УБРАТЬ
+      else if (currentFirst > requiredFirstVal) {
+        const toRemove = currentFirst - requiredFirstVal;
+
+        // Пробуем убрать МАКСИМАЛЬНО ВОЗМОЖНОЕ: 9, 8, 7, 6, 5, 4, 3, 2, 1
+        let removed = false;
+        for (let trySub = Math.min(9, toRemove, currentFirst); trySub >= 1; trySub--) {
+          if (currentFirst - trySub < 0) continue; // Нельзя уйти в минус
+
+          // Проверяем: можем ли убрать по правилу Просто?
+          if (this._canMinusDirect(currentFirst, trySub)) {
+            const newStates = this._applyAction(states, { value: -trySub, isFriend: false });
+
+            if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+              steps.push({
+                action: -trySub,
+                isFriend: false,
+                states: [...newStates]
+              });
+              states = newStates;
+              removed = true;
+              console.log(`➖ Подготовка: -${trySub}, состояние: [${newStates.join(', ')}]`);
+              break;
+            }
+          }
+        }
+
+        if (!removed) {
+          console.warn(`⚠️ Не можем подготовить единицы (вычитание): текущее=${currentFirst}, нужно=${requiredFirstVal}`);
+          break;
+        }
       }
     }
 
