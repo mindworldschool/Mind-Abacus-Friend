@@ -8,26 +8,27 @@
 //   СЛОЖЕНИЕ:  +n = +10 - friend,  где friend = 10 - n
 //   ВЫЧИТАНИЕ: -n = -10 + friend,  где friend = 10 - n
 //
-// ТРЕБОВАНИЯ ДЛЯ КАЖДОЙ ЦИФРЫ (согласно ТЗ):
-//   +1: первый разряд 9
-//   +2: первый разряд 8-9
-//   +3: первый разряд 7-9
-//   +4: первый разряд 6-9
-//   +5: первый разряд 5-9
-//   +6: первый разряд 4-9
-//   +7: первый разряд 3-9
-//   +8: первый разряд 2-9
-//   +9: первый разряд 1-9
+// ЦЕЛЕВОЙ РАЗРЯД (где происходит переход через 10):
+//   Двузначные (digitCount=2): целевой = 1 (десятки)
+//   Трехзначные (digitCount=3): целевой = 2 (сотни)
+//   Четырехзначные (digitCount=4): целевой = 3 (тысячи)
+//   Общая формула: targetPosition = digitCount - 1
 //
-//   -1: первый разряд 0
-//   -2: первый разряд 0-1
-//   -3: первый разряд 0-2
-//   -4: первый разряд 0-3
-//   -5: первый разряд 0-4
-//   -6: первый разряд 0-3
-//   -7: первый разряд 0-2
-//   -8: первый разряд 0-1
-//   -9: первый разряд 0
+// ДИАПАЗОНЫ (промежуточные результаты могут расти):
+//   Двузначные: 0-999 (трехзначные промежуточные!)
+//   Трехзначные: 0-9999 (четырехзначные промежуточные!)
+//   Формула: maxValue = 10^(digitCount+1) - 1
+//
+// ПРАВИЛО ПРОСТО:
+//   Одно ОДНОНАПРАВЛЕННОЕ движение бусин:
+//   - Сложение: только ДОБАВЛЕНИЕ (U: 0→1, L: увеличение)
+//   - Вычитание: только УБИРАНИЕ (U: 1→0, L: уменьшение)
+//   - НЕЛЬЗЯ смешивать добавление и убирание!
+//
+// ЗАПРЕТ МИКСА:
+//   Нельзя в одном многозначном действии смешивать:
+//   - Друзья в целевом разряде + Братья в другом разряде
+//   Все разряды (кроме целевого) должны работать по правилу Просто!
 
 export class FriendsExampleGenerator {
   constructor(config = {}) {
@@ -41,9 +42,8 @@ export class FriendsExampleGenerator {
       // Разрядность (минимум 2 для правила Друзья)
       digitCount: Math.max(2, config.digitCount || 2),
 
-      // Диапазон количества шагов
-      minSteps: config.minSteps || 3,
-      maxSteps: config.maxSteps || 7,
+      // ТОЧНОЕ количество шагов (не диапазон!)
+      stepsCount: config.stepsCount || config.maxSteps || 7,
 
       // Ограничения направления
       onlyAddition: config.onlyAddition || false,
@@ -72,12 +72,32 @@ export class FriendsExampleGenerator {
       this.config.digitCount = 2;
     }
 
+    // ЦЕЛЕВОЙ РАЗРЯД = самый старший (digitCount - 1)
+    this.targetPosition = this.config.digitCount - 1;
+
+    // РАСШИРЕННЫЙ ДИАПАЗОН (промежуточные результаты могут расти)
+    this.maxValue = Math.pow(10, this.config.digitCount + 1) - 1;
+
+    // Трекинг использования цифр Friends для разнообразия
+    this.digitUsageCount = {};
+    for (const digit of this.config.selectedDigits) {
+      this.digitUsageCount[digit] = 0;
+    }
+
     console.log(`🤝 FriendsExampleGenerator создан:
   Выбранные цифры Друзья: [${this.config.selectedDigits.join(', ')}]
   Простые цифры: [${this.config.simpleDigits.join(', ')}]
   Разрядность: ${this.config.digitCount}
-  Шаги: ${this.config.minSteps}-${this.config.maxSteps}
+  Целевой разряд: ${this.targetPosition} (${this._getPositionName(this.targetPosition)})
+  Точное количество шагов: ${this.config.stepsCount}
+  Максимальное значение: ${this.maxValue}
   Братья активны: ${this.config.brothersActive} (верхняя бусина ${this.config.brothersActive ? 'разрешена' : 'запрещена'})`);
+  }
+
+  // Вспомогательный метод: название разряда
+  _getPositionName(pos) {
+    const names = ['единицы', 'десятки', 'сотни', 'тысячи', 'десятки тысяч', 'сотни тысяч', 'миллионы'];
+    return names[pos] || `разряд ${pos}`;
   }
 
   // ========== СЕКЦИЯ 1: ФИЗИКА АБАКУСА ==========
@@ -108,10 +128,13 @@ export class FriendsExampleGenerator {
   }
 
   /**
-   * Можно ли выполнить +n НАПРЯМУЮ на одной стойке?
-   * Это одно движение вверх: добавляем бусины без убирания.
+   * Проверка правила ПРОСТО для сложения: ОДНО ОДНОНАПРАВЛЕННОЕ движение вверх
    *
-   * ВАЖНО: Если блок "Братья" НЕ активен → НЕЛЬЗЯ использовать верхнюю бусину!
+   * Можно ТОЛЬКО ДОБАВЛЯТЬ бусины (нельзя убирать):
+   * - Верхняя: 0→1 (добавить) или 0→0 / 1→1 (не трогать)
+   * - Нижние: L→L+k (добавить) или L→L (не трогать)
+   *
+   * НЕЛЬЗЯ смешивать добавление и убирание!
    *
    * @param {number} v - текущее значение разряда (0-9)
    * @param {number} n - сколько добавить (1-9)
@@ -128,20 +151,20 @@ export class FriendsExampleGenerator {
     const U2 = this._U(targetV);
     const L2 = this._L(targetV);
 
-    // КРИТИЧНО: Если Братья НЕ активны → верхняя бусина НЕ может меняться!
-    // Разрешены ТОЛЬКО действия с нижними бусинами (0→4)
+    // Если Братья НЕ активны → верхняя бусина НЕ может меняться
     if (!this.config.brothersActive && U2 !== U1) {
-      return false; // ❌ Нельзя трогать верхнюю бусину (пятёрку)
+      return false;
     }
 
-    // Жест вверх: можно только ДОБАВЛЯТЬ бусины
-    // Верхняя: U2 >= U1 (либо осталась, либо добавили)
-    // Нижние: L2 >= L1 (либо остались, либо добавили)
-    const topChange = U2 - U1;  // 0 или +1
-    const botChange = L2 - L1;  // 0..+4
+    // Изменения бусин
+    const topChange = U2 - U1;  // -1, 0, или +1
+    const botChange = L2 - L1;  // -4..+4
 
-    // Нельзя убирать ничего в жесте "вверх"
-    if (topChange < 0 || botChange < 0) return false;
+    // КРИТИЧНО: ОДНОНАПРАВЛЕННОСТЬ!
+    // При сложении можем только ДОБАВЛЯТЬ (не убирать)
+    if (topChange < 0 || botChange < 0) {
+      return false; // ❌ Убирание запрещено при движении "вверх"
+    }
 
     // Должно быть хоть какое-то изменение
     if (topChange === 0 && botChange === 0) return false;
@@ -150,10 +173,13 @@ export class FriendsExampleGenerator {
   }
 
   /**
-   * Можно ли выполнить -n НАПРЯМУЮ на одной стойке?
-   * Это одно движение вниз: убираем бусины без добавления.
+   * Проверка правила ПРОСТО для вычитания: ОДНО ОДНОНАПРАВЛЕННОЕ движение вниз
    *
-   * ВАЖНО: Если блок "Братья" НЕ активен → НЕЛЬЗЯ использовать верхнюю бусину!
+   * Можно ТОЛЬКО УБИРАТЬ бусины (нельзя добавлять):
+   * - Верхняя: 1→0 (убрать) или 0→0 / 1→1 (не трогать)
+   * - Нижние: L→L-k (убрать) или L→L (не трогать)
+   *
+   * НЕЛЬЗЯ смешивать добавление и убирание!
    *
    * @param {number} v - текущее значение разряда (0-9)
    * @param {number} n - сколько отнять (1-9)
@@ -170,19 +196,20 @@ export class FriendsExampleGenerator {
     const U2 = this._U(targetV);
     const L2 = this._L(targetV);
 
-    // КРИТИЧНО: Если Братья НЕ активны → верхняя бусина НЕ может меняться!
+    // Если Братья НЕ активны → верхняя бусина НЕ может меняться
     if (!this.config.brothersActive && U2 !== U1) {
-      return false; // ❌ Нельзя трогать верхнюю бусину (пятёрку)
+      return false;
     }
 
-    // Жест вниз: можно только УБИРАТЬ бусины
-    // Верхняя: U2 <= U1 (либо осталась, либо убрали)
-    // Нижние: L2 <= L1 (либо остались, либо убрали)
-    const topChange = U2 - U1;  // 0 или -1
-    const botChange = L2 - L1;  // -4..0
+    // Изменения бусин
+    const topChange = U2 - U1;  // -1, 0, или +1
+    const botChange = L2 - L1;  // -4..+4
 
-    // Нельзя добавлять ничего в жесте "вниз"
-    if (topChange > 0 || botChange > 0) return false;
+    // КРИТИЧНО: ОДНОНАПРАВЛЕННОСТЬ!
+    // При вычитании можем только УБИРАТЬ (не добавлять)
+    if (topChange > 0 || botChange > 0) {
+      return false; // ❌ Добавление запрещено при движении "вниз"
+    }
 
     // Должно быть хоть какое-то изменение
     if (topChange === 0 && botChange === 0) return false;
@@ -191,53 +218,197 @@ export class FriendsExampleGenerator {
   }
 
   /**
-   * Можно ли добавить +10 (перенос в следующий разряд)?
+   * Можно ли добавить +10 к целевому разряду (перенос)?
    * @param {number[]} states - состояние всех разрядов
-   * @param {number} position - индекс текущего разряда
    * @returns {boolean}
    */
-  _canAddTen(states, position) {
-    // Нужен следующий разряд
-    if (position + 1 >= states.length) {
-      return false;
-    }
-
-    const nextVal = states[position + 1];
-
-    // Главное условие: есть ли свободные бусины?
-    // Можно добавить 1, если разряд < 9
-    return nextVal < 9;
+  _canAddTenToTarget(states) {
+    const targetVal = states[this.targetPosition] || 0;
+    return targetVal < 9; // Есть свободные бусины
   }
 
   /**
-   * Можно ли убрать -10 (заём из следующего разряда)?
+   * Можно ли убрать -10 из целевого разряда (заём)?
    * @param {number[]} states - состояние всех разрядов
-   * @param {number} position - индекс текущего разряда
    * @returns {boolean}
    */
-  _canSubtractTen(states, position) {
-    // Нужен следующий разряд
-    if (position + 1 >= states.length) {
+  _canSubtractTenFromTarget(states) {
+    const targetVal = states[this.targetPosition] || 0;
+    return targetVal > 0; // Есть активные бусины
+  }
+
+  // ========== СЕКЦИЯ 2: МНОГОЗНАЧНЫЕ ДЕЙСТВИЯ ==========
+
+  /**
+   * Разбить число на цифры по разрядам
+   *
+   * Пример: 123 → [3, 2, 1] (младшие разряды первые)
+   *
+   * @param {number} num - число
+   * @param {number} minDigits - минимальное количество разрядов
+   * @returns {number[]} - массив цифр
+   */
+  _numberToDigits(num, minDigits = 1) {
+    const digits = [];
+    let n = Math.abs(num);
+
+    while (n > 0 || digits.length < minDigits) {
+      digits.push(n % 10);
+      n = Math.floor(n / 10);
+    }
+
+    return digits;
+  }
+
+  /**
+   * Собрать число из цифр по разрядам
+   *
+   * Пример: [3, 2, 1] → 123
+   *
+   * @param {number[]} digits - массив цифр (младшие первые)
+   * @returns {number}
+   */
+  _digitsToNumber(digits) {
+    let result = 0;
+    for (let i = digits.length - 1; i >= 0; i--) {
+      result = result * 10 + digits[i];
+    }
+    return result;
+  }
+
+  /**
+   * Проверить: можно ли применить многозначное действие по правилу Просто?
+   *
+   * КРИТИЧНО: Проверяем КАЖДЫЙ разряд отдельно!
+   *
+   * @param {number[]} states - текущее состояние
+   * @param {number} value - значение действия (может быть многозначным)
+   * @returns {boolean}
+   */
+  _canApplySimpleDirect(states, value) {
+    const isAddition = value >= 0;
+    const actionDigits = this._numberToDigits(Math.abs(value), this.config.digitCount);
+
+    // Проверяем каждый разряд
+    for (let pos = 0; pos < this.config.digitCount; pos++) {
+      const currentVal = states[pos] || 0;
+      const digitChange = actionDigits[pos] || 0;
+
+      if (digitChange === 0) continue; // Разряд не меняется
+
+      if (isAddition) {
+        if (!this._canPlusDirect(currentVal, digitChange)) {
+          return false; // ❌ Этот разряд требует Братья
+        }
+      } else {
+        if (!this._canMinusDirect(currentVal, digitChange)) {
+          return false; // ❌ Этот разряд требует Братья
+        }
+      }
+    }
+
+    // Все разряды можно сделать правилом Просто!
+    return true;
+  }
+
+  /**
+   * Проверить: является ли действие Friends (переход через 10 в целевом разряде)?
+   *
+   * @param {number[]} states - текущее состояние
+   * @param {number} value - значение действия
+   * @param {number} friendDigit - цифра Friends (1-9)
+   * @returns {boolean}
+   */
+  _isFriendsAction(states, value, friendDigit) {
+    const isAddition = value >= 0;
+    const actionDigits = this._numberToDigits(Math.abs(value), this.config.digitCount);
+    const targetDigit = actionDigits[this.targetPosition] || 0;
+
+    // Проверка 1: цифра в целевом разряде должна совпадать с friendDigit
+    if (targetDigit !== friendDigit) {
       return false;
     }
 
-    const nextVal = states[position + 1];
+    const targetVal = states[this.targetPosition] || 0;
 
-    // Главное условие: есть ли активные бусины?
-    return nextVal > 0;
+    if (isAddition) {
+      // Проверка 2: должен быть переход через 10
+      const newVal = targetVal + targetDigit;
+      if (newVal < 10) {
+        return false; // Нет перехода через 10
+      }
+
+      // Проверка 3: можем ли выполнить формулу +n = +10 - friend?
+      const friend = 10 - targetDigit;
+      return this._canMinusDirect(targetVal, friend);
+    } else {
+      // Проверка 2: должен быть переход через 0
+      const newVal = targetVal - targetDigit;
+      if (newVal >= 0) {
+        return false; // Нет перехода через 0
+      }
+
+      // Проверка 3: можем ли выполнить формулу -n = -10 + friend?
+      const friend = 10 - targetDigit;
+      return this._canPlusDirect(targetVal, friend);
+    }
   }
 
-  // ========== СЕКЦИЯ 2: ТАБЛИЦЫ ТРЕБОВАНИЙ ДЛЯ КАЖДОЙ ЦИФРЫ ==========
+  /**
+   * Проверить: есть ли МИКС (Друзья в целевом + Братья в другом)?
+   *
+   * КРИТИЧНО: Все разряды кроме целевого должны работать по Просто!
+   *
+   * @param {number[]} states - текущее состояние
+   * @param {number} value - значение действия
+   * @param {number} friendDigit - цифра Friends
+   * @returns {boolean} - true если есть МИКС (действие недоступно)
+   */
+  _hasMix(states, value, friendDigit) {
+    const isAddition = value >= 0;
+    const actionDigits = this._numberToDigits(Math.abs(value), this.config.digitCount);
+
+    // Проверяем все разряды КРОМЕ целевого
+    for (let pos = 0; pos < this.config.digitCount; pos++) {
+      if (pos === this.targetPosition) continue; // Целевой разряд пропускаем
+
+      const currentVal = states[pos] || 0;
+      const digitChange = actionDigits[pos] || 0;
+
+      if (digitChange === 0) continue; // Разряд не меняется
+
+      // Проверяем: можем ли сделать этот разряд по правилу Просто?
+      if (isAddition) {
+        if (!this._canPlusDirect(currentVal, digitChange)) {
+          return true; // ❌ МИКС! Этот разряд требует Братья
+        }
+      } else {
+        if (!this._canMinusDirect(currentVal, digitChange)) {
+          return true; // ❌ МИКС! Этот разряд требует Братья
+        }
+      }
+    }
+
+    // Проверка переполнения разрядов (не больше 9)
+    for (let pos = 0; pos < this.config.digitCount; pos++) {
+      const currentVal = states[pos] || 0;
+      const digitChange = actionDigits[pos] || 0;
+      const newVal = isAddition ? currentVal + digitChange : currentVal - digitChange;
+
+      if (newVal < 0 || newVal > 9) {
+        return true; // ❌ Выход за пределы разряда
+      }
+    }
+
+    return false; // ✅ МИКСА нет, все разряды работают по Просто
+  }
+
+  // ========== СЕКЦИЯ 3: ТАБЛИЦЫ ТРЕБОВАНИЙ ДЛЯ КАЖДОЙ ЦИФРЫ ==========
 
   /**
-   * Получить требования к состоянию для применения +digit по правилу Друзья
+   * Получить требования к состоянию целевого разряда для применения +digit по правилу Друзья
    *
    * Возвращает: { minState, maxState, states: [...] }
-   *
-   * Примеры:
-   *   +1: нужно 9 (все бусины активны)
-   *   +2: нужно 8 или 9
-   *   +5: нужно 5-9 (верхняя бусина активна)
    */
   _getAdditionRequirements(digit) {
     const friend = 10 - digit;
@@ -267,14 +438,9 @@ export class FriendsExampleGenerator {
   }
 
   /**
-   * Получить требования к состоянию для применения -digit по правилу Друзья
+   * Получить требования к состоянию целевого разряда для применения -digit по правилу Друзья
    *
    * Возвращает: { minState, maxState, states: [...] }
-   *
-   * Примеры:
-   *   -1: нужно 0 (нет активных бусин)
-   *   -2: нужно 0 или 1
-   *   -5: нужно 0-4 (верхняя НЕ активна)
    */
   _getSubtractionRequirements(digit) {
     const friend = 10 - digit;
@@ -304,10 +470,10 @@ export class FriendsExampleGenerator {
     }
   }
 
-  // ========== СЕКЦИЯ 3: ГЕНЕРАЦИЯ ПРИМЕРОВ ==========
+  // ========== СЕКЦИЯ 4: ГЕНЕРАЦИЯ ПРИМЕРОВ ==========
 
   /**
-   * Главный метод: сгенерировать пример
+   * Главный метод: сгенерировать пример с ТОЧНЫМ количеством шагов
    */
   generate() {
     const maxAttempts = 100;
@@ -344,112 +510,105 @@ export class FriendsExampleGenerator {
     // Инициализация
     let states = Array(this.config.digitCount).fill(0);
     const steps = [];
-    const stepsCount = this.config.minSteps +
-      Math.floor(Math.random() * (this.config.maxSteps - this.config.minSteps + 1));
+    const targetSteps = this.config.stepsCount; // ТОЧНОЕ количество
 
     let friendStepsCount = 0;
     let attempts = 0;
-    const maxAttempts = 1000;
+    const maxAttempts = targetSteps * 50; // Больше попыток для большего количества шагов
 
-    // Целевое количество Friends действий (минимум 1, лучше 30-50% от общего)
+    // Минимум Friends = 1 (обязательно)
     const minFriendSteps = 1;
-    const targetFriendSteps = Math.max(1, Math.floor(stepsCount * 0.4));
 
-    console.log(`🎯 Генерация Friends примера: ${stepsCount} шагов, цель ${targetFriendSteps} Friends`);
+    // Трекинг последних действий для разнообразия
+    let lastSimpleDigit = null;
+    let stepsSinceLastFriend = 0;
 
-    while (steps.length < stepsCount && attempts < maxAttempts) {
+    console.log(`🎯 Генерация Friends примера: ${targetSteps} шагов (точно)`);
+
+    while (steps.length < targetSteps && attempts < maxAttempts) {
       attempts++;
       const isFirst = steps.length === 0;
-      const stepsRemaining = stepsCount - steps.length;
+      const stepsRemaining = targetSteps - steps.length;
 
       // Решаем: пытаться ли сгенерировать Friends действие
       const needMoreFriends = friendStepsCount < minFriendSteps;
-      const wantMoreFriends = friendStepsCount < targetFriendSteps;
 
-      // Более мягкое условие: пытаемся Friends только если есть место (минимум 2 шага)
-      // и либо нужны Friends, либо хотим их с вероятностью 40%
-      const tryFriend = needMoreFriends || (wantMoreFriends && stepsRemaining >= 2 && Math.random() < 0.4);
+      // Стратегия: равномерное распределение Friends
+      // - Если не хватает минимума → ОБЯЗАТЕЛЬНО
+      // - Если прошло 3+ шагов с последнего Friends → вероятность 50%
+      // - Иначе вероятность 30%
+      const wantMoreFriends = stepsSinceLastFriend >= 3 ? 0.5 : 0.3;
+
+      const tryFriend = needMoreFriends ||
+                        (stepsRemaining >= 2 && Math.random() < wantMoreFriends);
 
       if (tryFriend) {
-        // Планируем последовательность действий для Friends
-        const plannedActions = this._planFriendSequence(states, isFirst, stepsRemaining);
+        // Попытка сгенерировать Friends действие
+        const friendAction = this._generateFriendAction(states, isFirst);
 
-        if (plannedActions && plannedActions.length > 0) {
-          // Применяем все запланированные шаги
-          let allSuccessful = true;
-          const appliedSteps = [];
-          let currentStates = states;
+        if (friendAction) {
+          // Применяем Friends действие
+          const newStates = this._applyAction(states, friendAction);
 
-          for (const action of plannedActions) {
-            const newStates = this._applyAction(currentStates, action);
-
-            if (!newStates || !this._isValidState(newStates) || this._checkOverflow(newStates)) {
-              allSuccessful = false;
-              break;
-            }
-
-            appliedSteps.push({
-              action: action.value,
-              isFriend: action.isFriend,
-              friendN: action.isFriend ? Math.abs(action.value) : undefined,
-              formula: action.isFriend ? this._buildFormula(action.value) : undefined,
+          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+            steps.push({
+              action: friendAction.value,
+              isFriend: true,
+              friendN: Math.abs(this._numberToDigits(Math.abs(friendAction.value), this.config.digitCount)[this.targetPosition]),
+              formula: this._buildFormula(friendAction.value, this.targetPosition),
               states: [...newStates]
             });
 
-            currentStates = newStates;
-          }
+            states = newStates;
+            friendStepsCount++;
+            stepsSinceLastFriend = 0;
 
-          if (allSuccessful && appliedSteps.length > 0) {
-            // Все шаги применены успешно
-            for (const step of appliedSteps) {
-              steps.push(step);
+            // Обновляем статистику использования цифры
+            const usedDigit = Math.abs(this._numberToDigits(Math.abs(friendAction.value), this.config.digitCount)[this.targetPosition]);
+            this.digitUsageCount[usedDigit]++;
 
-              if (step.isFriend) {
-                friendStepsCount++;
-              }
-            }
-
-            states = currentStates;
-            continue; // Переходим к следующей итерации
+            continue;
           }
         }
       }
 
-      // Если Friends не получилось или не пытались, используем Simple действие
-      const action = this._generateSimpleAction(states, isFirst);
+      // Генерируем простое действие
+      const simpleAction = this._generateSimpleAction(states, isFirst, lastSimpleDigit);
 
-      if (!action) {
-        // Ничего не подошло - пробуем сбросить состояние или продолжить
-        // Если уже есть минимум шагов с Friends - завершаем
-        if (steps.length >= this.config.minSteps && friendStepsCount >= minFriendSteps) {
-          break;
+      if (!simpleAction) {
+        // Ничего не подошло
+        if (steps.length >= 3 && friendStepsCount >= minFriendSteps && stepsRemaining === 0) {
+          break; // Уже есть минимум и достигли цели
         }
         continue;
       }
 
       // Применяем действие
-      const newStates = this._applyAction(states, action);
+      const newStates = this._applyAction(states, simpleAction);
 
       if (!newStates || !this._isValidState(newStates) || this._checkOverflow(newStates)) {
         continue;
       }
 
       steps.push({
-        action: action.value,
+        action: simpleAction.value,
         isFriend: false,
         states: [...newStates]
       });
 
       states = newStates;
+      stepsSinceLastFriend++;
+      lastSimpleDigit = Math.abs(simpleAction.value) % 10; // Последняя цифра
+    }
+
+    // Проверка: достигли ли ТОЧНОГО количества шагов?
+    if (steps.length !== targetSteps) {
+      return null; // ❌ Не достигли точного количества
     }
 
     // Проверка: есть ли хотя бы 1 Friends действие?
     if (friendStepsCount === 0) {
-      return null; // Попытка провалилась
-    }
-
-    if (steps.length < this.config.minSteps) {
-      return null; // Слишком мало шагов
+      return null; // ❌ Нет Friends
     }
 
     return {
@@ -460,11 +619,175 @@ export class FriendsExampleGenerator {
   }
 
   /**
-   * Построить формулу для Friends действия
-   * @param {number} value - значение действия (+1, -2, и т.д.)
+   * Генерация Friends действия
+   *
+   * Стратегия:
+   * 1. Выбираем цифру Friends (равномерно из selectedDigits)
+   * 2. Выбираем знак (+/-)
+   * 3. Генерируем многозначное действие
+   * 4. Проверяем отсутствие МИКСА
+   * 5. Если текущее состояние не подходит → пробуем другую цифру
    */
-  _buildFormula(value) {
-    const friend = 10 - Math.abs(value);
+  _generateFriendAction(states, isFirst) {
+    const { selectedDigits, onlyAddition, onlySubtraction } = this.config;
+
+    // Сортируем цифры по частоте использования (меньше использованные - приоритет)
+    const sortedDigits = [...selectedDigits].sort((a, b) => {
+      return this.digitUsageCount[a] - this.digitUsageCount[b];
+    });
+
+    // Перемешиваем первую половину (наименее использованные)
+    const halfLen = Math.ceil(sortedDigits.length / 2);
+    const priorityDigits = sortedDigits.slice(0, halfLen).sort(() => Math.random() - 0.5);
+    const restDigits = sortedDigits.slice(halfLen);
+
+    const digitsToTry = [...priorityDigits, ...restDigits];
+
+    for (const friendDigit of digitsToTry) {
+      // Пробуем сложение
+      if (!onlySubtraction && (isFirst || true)) {
+        const action = this._tryGenerateFriendAddition(friendDigit, states, isFirst);
+        if (action) return action;
+      }
+
+      // Пробуем вычитание
+      if (!onlyAddition && !isFirst) {
+        const action = this._tryGenerateFriendSubtraction(friendDigit, states);
+        if (action) return action;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Попытка сгенерировать +action с правилом Друзья для заданной цифры
+   */
+  _tryGenerateFriendAddition(friendDigit, states, isFirst) {
+    const requirements = this._getAdditionRequirements(friendDigit);
+    const targetVal = states[this.targetPosition] || 0;
+
+    // Проверка: подходит ли текущее состояние целевого разряда?
+    if (!requirements.states.includes(targetVal)) {
+      return null; // Целевой разряд не готов
+    }
+
+    // Проверка: можем ли применить формулу?
+    const friend = 10 - friendDigit;
+    if (!this._canMinusDirect(targetVal, friend)) {
+      return null; // Не можем вычесть friend
+    }
+
+    // Генерируем многозначное действие
+    // Целевой разряд: friendDigit
+    // Остальные разряды: подбираем так, чтобы работало правило Просто
+
+    const actionDigits = Array(this.config.digitCount).fill(0);
+    actionDigits[this.targetPosition] = friendDigit;
+
+    // Подбираем цифры для остальных разрядов
+    for (let pos = 0; pos < this.config.digitCount; pos++) {
+      if (pos === this.targetPosition) continue;
+
+      const currentVal = states[pos] || 0;
+
+      // Подбираем случайную цифру, которая работает по Просто
+      const possibleDigits = [];
+      for (let d = 0; d <= 9; d++) {
+        if (this._canPlusDirect(currentVal, d)) {
+          possibleDigits.push(d);
+        }
+      }
+
+      if (possibleDigits.length === 0) {
+        return null; // Не можем подобрать для этого разряда
+      }
+
+      // Выбираем случайную (предпочитаем ненулевые для разнообразия)
+      const nonZero = possibleDigits.filter(d => d > 0);
+      const candidates = nonZero.length > 0 && Math.random() < 0.7 ? nonZero : possibleDigits;
+      actionDigits[pos] = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    const value = this._digitsToNumber(actionDigits);
+
+    // Финальная проверка: нет МИКСА?
+    if (this._hasMix(states, value, friendDigit)) {
+      return null; // ❌ МИКС
+    }
+
+    return { value, isFriend: true };
+  }
+
+  /**
+   * Попытка сгенерировать -action с правилом Друзья для заданной цифры
+   */
+  _tryGenerateFriendSubtraction(friendDigit, states) {
+    const requirements = this._getSubtractionRequirements(friendDigit);
+    const targetVal = states[this.targetPosition] || 0;
+
+    // Проверка: подходит ли текущее состояние целевого разряда?
+    if (!requirements.states.includes(targetVal)) {
+      return null;
+    }
+
+    // Проверка: можем ли применить формулу?
+    const friend = 10 - friendDigit;
+    if (!this._canPlusDirect(targetVal, friend)) {
+      return null;
+    }
+
+    // Проверка: есть ли что занимать из целевого разряда?
+    if (!this._canSubtractTenFromTarget(states)) {
+      return null;
+    }
+
+    // Генерируем многозначное действие
+    const actionDigits = Array(this.config.digitCount).fill(0);
+    actionDigits[this.targetPosition] = friendDigit;
+
+    // Подбираем цифры для остальных разрядов
+    for (let pos = 0; pos < this.config.digitCount; pos++) {
+      if (pos === this.targetPosition) continue;
+
+      const currentVal = states[pos] || 0;
+
+      const possibleDigits = [];
+      for (let d = 0; d <= 9; d++) {
+        if (this._canMinusDirect(currentVal, d)) {
+          possibleDigits.push(d);
+        }
+      }
+
+      if (possibleDigits.length === 0) {
+        return null;
+      }
+
+      const nonZero = possibleDigits.filter(d => d > 0);
+      const candidates = nonZero.length > 0 && Math.random() < 0.7 ? nonZero : possibleDigits;
+      actionDigits[pos] = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    const value = -this._digitsToNumber(actionDigits);
+
+    // Финальная проверка: нет МИКСА?
+    if (this._hasMix(states, value, friendDigit)) {
+      return null;
+    }
+
+    return { value, isFriend: true };
+  }
+
+  /**
+   * Построить формулу для Friends действия
+   *
+   * @param {number} value - значение действия (может быть многозначным)
+   * @param {number} targetPos - позиция целевого разряда
+   */
+  _buildFormula(value, targetPos) {
+    const actionDigits = this._numberToDigits(Math.abs(value), this.config.digitCount);
+    const targetDigit = actionDigits[targetPos] || 0;
+    const friend = 10 - targetDigit;
 
     if (value > 0) {
       // +n = +10 - friend
@@ -482,17 +805,196 @@ export class FriendsExampleGenerator {
   }
 
   /**
+   * Генерация простого (не-Friends) действия для разнообразия
+   */
+  _generateSimpleAction(states, isFirst, lastDigit = null) {
+    const availableActions = [];
+
+    // Генерируем многозначные простые действия
+    const maxActionValue = Math.pow(10, this.config.digitCount) - 1;
+
+    // Пробуем несколько случайных действий
+    for (let attempt = 0; attempt < 50; attempt++) {
+      // Генерируем случайное многозначное действие
+      const actionDigits = [];
+      for (let pos = 0; pos < this.config.digitCount; pos++) {
+        const currentVal = states[pos] || 0;
+
+        // Подбираем случайную цифру для этого разряда
+        const possibleDigits = [];
+        for (let d = 0; d <= 9; d++) {
+          if (this._canPlusDirect(currentVal, d)) {
+            possibleDigits.push(d);
+          }
+        }
+
+        if (possibleDigits.length > 0) {
+          actionDigits.push(possibleDigits[Math.floor(Math.random() * possibleDigits.length)]);
+        } else {
+          actionDigits.push(0);
+        }
+      }
+
+      const value = this._digitsToNumber(actionDigits);
+
+      // Избегаем повторения последней цифры
+      const firstDigit = actionDigits[0];
+      if (lastDigit !== null && firstDigit === lastDigit && Math.random() < 0.7) {
+        continue; // Пропускаем с вероятностью 70%
+      }
+
+      if (value > 0 && isFirst) {
+        if (this._canApplySimpleDirect(states, value)) {
+          availableActions.push(value);
+        }
+      }
+
+      // Вычитание (только если не первое действие)
+      if (!isFirst) {
+        // Пробуем вычитание
+        const subDigits = [];
+        let canSubtract = true;
+
+        for (let pos = 0; pos < this.config.digitCount; pos++) {
+          const currentVal = states[pos] || 0;
+          const possibleDigits = [];
+
+          for (let d = 0; d <= 9; d++) {
+            if (this._canMinusDirect(currentVal, d)) {
+              possibleDigits.push(d);
+            }
+          }
+
+          if (possibleDigits.length > 0) {
+            subDigits.push(possibleDigits[Math.floor(Math.random() * possibleDigits.length)]);
+          } else {
+            canSubtract = false;
+            break;
+          }
+        }
+
+        if (canSubtract) {
+          const subValue = this._digitsToNumber(subDigits);
+          if (subValue > 0) {
+            availableActions.push(-subValue);
+          }
+        }
+      }
+    }
+
+    if (availableActions.length === 0) {
+      return null;
+    }
+
+    const action = availableActions[Math.floor(Math.random() * availableActions.length)];
+    return { value: action, isFriend: false };
+  }
+
+  /**
+   * Применить действие к состоянию абакуса
+   */
+  _applyAction(states, actionObj) {
+    const newStates = [...states];
+    const value = actionObj.value;
+    const isFriend = actionObj.isFriend;
+
+    if (!isFriend) {
+      // Простое действие: применяем к каждому разряду
+      const actionDigits = this._numberToDigits(Math.abs(value), this.config.digitCount);
+      const isAddition = value >= 0;
+
+      for (let pos = 0; pos < this.config.digitCount; pos++) {
+        const digit = actionDigits[pos] || 0;
+        if (isAddition) {
+          newStates[pos] = (newStates[pos] || 0) + digit;
+        } else {
+          newStates[pos] = (newStates[pos] || 0) - digit;
+        }
+      }
+    } else {
+      // Friends действие: перенос в целевом разряде
+      const actionDigits = this._numberToDigits(Math.abs(value), this.config.digitCount);
+      const isAddition = value >= 0;
+
+      // Применяем ко всем разрядам кроме целевого
+      for (let pos = 0; pos < this.config.digitCount; pos++) {
+        if (pos === this.targetPosition) continue;
+
+        const digit = actionDigits[pos] || 0;
+        if (isAddition) {
+          newStates[pos] = (newStates[pos] || 0) + digit;
+        } else {
+          newStates[pos] = (newStates[pos] || 0) - digit;
+        }
+      }
+
+      // Целевой разряд: применяем формулу Friends
+      const targetDigit = actionDigits[this.targetPosition] || 0;
+      const friend = 10 - targetDigit;
+
+      if (isAddition) {
+        // +n = +10 - friend
+        // Добавляем перенос в следующий разряд
+        if (this.targetPosition + 1 < newStates.length) {
+          newStates[this.targetPosition + 1] = (newStates[this.targetPosition + 1] || 0) + 1;
+        } else {
+          newStates.push(1); // Создаем новый разряд
+        }
+        // Вычитаем friend из целевого
+        newStates[this.targetPosition] = (newStates[this.targetPosition] || 0) - friend;
+      } else {
+        // -n = -10 + friend
+        // Занимаем из следующего разряда
+        if (this.targetPosition + 1 < newStates.length) {
+          newStates[this.targetPosition + 1] = (newStates[this.targetPosition + 1] || 0) - 1;
+        }
+        // Добавляем friend к целевому
+        newStates[this.targetPosition] = (newStates[this.targetPosition] || 0) + friend;
+      }
+    }
+
+    // Валидация
+    for (let i = 0; i < newStates.length; i++) {
+      if (newStates[i] < 0 || newStates[i] > 9) {
+        return null; // Невалидное состояние
+      }
+    }
+
+    return newStates;
+  }
+
+  /**
+   * Проверка валидности состояния
+   */
+  _isValidState(states) {
+    for (let i = 0; i < states.length; i++) {
+      if (states[i] < 0 || states[i] > 9) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Проверка переполнения: результат должен быть в расширенном диапазоне
+   */
+  _checkOverflow(states) {
+    const value = this.stateToNumber(states);
+    return value > this.maxValue; // Проверяем расширенный диапазон
+  }
+
+  /**
    * Валидация примера
    */
   _validateExample(example) {
     const { start, steps, answer } = example;
 
-    // 1. Проверка наличия шагов
-    if (!steps || steps.length < this.config.minSteps || steps.length > this.config.maxSteps) {
+    // 1. Проверка ТОЧНОГО количества шагов
+    if (steps.length !== this.config.stepsCount) {
       return false;
     }
 
-    // 2. Проверка наличия Friends шагов (ОБЯЗАТЕЛЬНО!)
+    // 2. Проверка наличия Friends шагов (минимум 1!)
     const friendSteps = steps.filter(s => s.isFriend);
     if (friendSteps.length < 1) {
       return false;
@@ -512,7 +1014,7 @@ export class FriendsExampleGenerator {
         return false;
       }
 
-      // Проверка переполнения
+      // Проверка переполнения (расширенный диапазон)
       if (this._checkOverflow(step.states)) {
         return false;
       }
@@ -533,56 +1035,134 @@ export class FriendsExampleGenerator {
   _fallbackExample() {
     const steps = [];
     let states = Array(this.config.digitCount).fill(0);
+    const targetSteps = this.config.stepsCount;
 
-    // Генерируем достаточное количество шагов (минимум minSteps)
-    const targetSteps = this.config.minSteps;
+    console.log(`⚠️ Используем fallback генерацию для ${targetSteps} шагов`);
 
-    // Сначала добавляем простые шаги для разнообразия
-    const simpleStepsCount = Math.max(1, targetSteps - 2);
+    // Стратегия: подготавливаем целевой разряд и применяем Friends
+    let friendsAdded = 0;
+    const minFriends = Math.max(1, Math.floor(targetSteps * 0.3));
+    const friendDigit = this.config.selectedDigits[0] || 1;
 
-    for (let i = 0; i < simpleStepsCount; i++) {
-      const action = (i % 2 === 0) ? 2 : 3; // Чередуем +2 и +3
-      const newStates = [...states];
-      newStates[0] += action;
+    // Получаем требования для Friends
+    const requirements = this._getAdditionRequirements(friendDigit);
+    const targetState = requirements.minState; // Нужное состояние целевого разряда
 
-      steps.push({
-        action: action,
-        isFriend: false,
-        states: [...newStates]
-      });
+    for (let i = 0; i < targetSteps; i++) {
+      const currentTargetVal = states[this.targetPosition] || 0;
+      const needFriend = friendsAdded < minFriends;
+      const canFriend = requirements.states.includes(currentTargetVal);
 
-      states = newStates;
+      // Пытаемся применить Friends если нужно и возможно
+      if (needFriend && canFriend && (targetSteps - i) >= 1) {
+        const friend = 10 - friendDigit;
+
+        // Проверяем что можем вычесть friend из целевого разряда
+        if (this._canMinusDirect(currentTargetVal, friend)) {
+          // Создаем Friends действие
+          const actionDigits = Array(this.config.digitCount).fill(0);
+          actionDigits[this.targetPosition] = friendDigit;
+
+          const value = this._digitsToNumber(actionDigits);
+          const newStates = this._applyAction(states, { value, isFriend: true });
+
+          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+            steps.push({
+              action: value,
+              isFriend: true,
+              friendN: friendDigit,
+              formula: this._buildFormula(value, this.targetPosition),
+              states: [...newStates]
+            });
+            states = newStates;
+            friendsAdded++;
+            continue;
+          }
+        }
+      }
+
+      // Простое действие: подготовка или заполнение
+      // Если нужно подготовить целевой разряд
+      if (needFriend && currentTargetVal < targetState && (targetSteps - i) >= 2) {
+        // Добавляем к целевому разряду
+        const actionDigits = Array(this.config.digitCount).fill(0);
+        const addAmount = Math.min(4, targetState - currentTargetVal); // Максимум +4 за раз
+        actionDigits[this.targetPosition] = addAmount;
+
+        const value = this._digitsToNumber(actionDigits);
+        const newStates = this._applyAction(states, { value, isFriend: false });
+
+        if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+          steps.push({
+            action: value,
+            isFriend: false,
+            states: [...newStates]
+          });
+          states = newStates;
+          continue;
+        }
+      }
+
+      // Обычное простое действие к первому разряду
+      const firstVal = states[0] || 0;
+      let added = false;
+
+      // Пробуем +1, +2, +3, +4
+      for (const val of [1, 2, 3, 4]) {
+        if (this._canPlusDirect(firstVal, val)) {
+          const actionDigits = Array(this.config.digitCount).fill(0);
+          actionDigits[0] = val;
+
+          const value = this._digitsToNumber(actionDigits);
+          const newStates = this._applyAction(states, { value, isFriend: false });
+
+          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+            steps.push({
+              action: value,
+              isFriend: false,
+              states: [...newStates]
+            });
+            states = newStates;
+            added = true;
+            break;
+          }
+        }
+      }
+
+      if (!added) {
+        // Пробуем добавить к любому разряду
+        for (let pos = 0; pos < this.config.digitCount; pos++) {
+          const posVal = states[pos] || 0;
+          for (const val of [1, 2, 3, 4]) {
+            if (this._canPlusDirect(posVal, val)) {
+              const actionDigits = Array(this.config.digitCount).fill(0);
+              actionDigits[pos] = val;
+
+              const value = this._digitsToNumber(actionDigits);
+              const newStates = this._applyAction(states, { value, isFriend: false });
+
+              if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+                steps.push({
+                  action: value,
+                  isFriend: false,
+                  states: [...newStates]
+                });
+                states = newStates;
+                added = true;
+                break;
+              }
+            }
+          }
+          if (added) break;
+        }
+      }
+
+      // Если всё еще не добавили - пропускаем
+      if (!added) {
+        console.warn(`⚠️ Fallback: не смогли добавить шаг ${i + 1}`);
+        continue;
+      }
     }
-
-    // Теперь подводим к состоянию 9 для Friends действия +1
-    const currentValue = states[0];
-    const needToAdd = 9 - currentValue;
-
-    if (needToAdd > 0) {
-      const newStates = [...states];
-      newStates[0] = 9;
-
-      steps.push({
-        action: needToAdd,
-        isFriend: false,
-        states: [...newStates]
-      });
-
-      states = newStates;
-    }
-
-    // Добавляем Friends действие +1
-    steps.push({
-      action: 1,
-      isFriend: true,
-      friendN: 1,
-      formula: [{ op: '+', val: 10 }, { op: '-', val: 9 }],
-      states: [0, states[1] + 1, ...states.slice(2)]
-    });
-
-    states = [0, states[1] + 1, ...states.slice(2)];
-
-    console.log(`⚠️ Используем fallback пример с ${steps.length} шагами`);
 
     return {
       start: Array(this.config.digitCount).fill(0),
@@ -591,309 +1171,7 @@ export class FriendsExampleGenerator {
     };
   }
 
-  // ========== СЕКЦИЯ 4: ПЛАНИРОВАНИЕ FRIENDS ДЕЙСТВИЙ ==========
-
-  /**
-   * Спланировать последовательность действий для применения одного Friends действия
-   *
-   * Возвращает: [{value, isFriend}, ...] или null
-   */
-  _planFriendSequence(states, isFirst, stepsRemaining) {
-    const { selectedDigits, onlyAddition, onlySubtraction } = this.config;
-
-    // Перемешиваем цифры для случайного выбора
-    const shuffled = [...selectedDigits].sort(() => Math.random() - 0.5);
-
-    for (const digit of shuffled) {
-      // Пробуем +digit (добавление)
-      if (!onlySubtraction && (isFirst || digit > 0)) {
-        const plan = this._planAddition(digit, states, isFirst, stepsRemaining);
-        if (plan && plan.length > 0) {
-          return plan;
-        }
-      }
-
-      // Пробуем -digit (вычитание)
-      if (!onlyAddition && !isFirst) {
-        const plan = this._planSubtraction(digit, states, stepsRemaining);
-        if (plan && plan.length > 0) {
-          return plan;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Спланировать +digit по правилу Друзья
-   *
-   * Формула: +digit = +10 - friend, где friend = 10 - digit
-   */
-  _planAddition(digit, states, isFirst, stepsRemaining) {
-    const position = 0; // Работаем с первым разрядом (единицы)
-    const currentValue = states[position];
-
-    // Получаем требования для этой цифры
-    const requirements = this._getAdditionRequirements(digit);
-
-    // Проверяем физическую возможность +10
-    if (!this._canAddTen(states, position)) {
-      return null; // Нет места в следующем разряде
-    }
-
-    // Проверяем, можем ли применить Friends СЕЙЧАС
-    if (requirements.states.includes(currentValue)) {
-      const friend = 10 - digit;
-
-      // Дополнительная проверка: можем ли вычесть friend?
-      if (this._canMinusDirect(currentValue, friend)) {
-        // Можем применить сразу!
-        return [{ value: digit, isFriend: true }];
-      }
-    }
-
-    // Не можем применить сейчас - нужна подготовка
-    const targetValue = requirements.minState;
-    const needToAdd = targetValue - currentValue;
-
-    if (needToAdd <= 0) {
-      return null; // Что-то не так
-    }
-
-    // Проверяем, хватает ли места для подготовки
-    if (stepsRemaining < 2) {
-      return null; // Недостаточно шагов
-    }
-
-    const maxCanAdd = 9 - currentValue;
-    if (needToAdd > maxCanAdd) {
-      return null; // Не можем подготовить
-    }
-
-    // Попытка прямой подготовки (за 1 шаг)
-    if (this._canPlusDirect(currentValue, needToAdd)) {
-      return [
-        { value: needToAdd, isFriend: false },  // подготовка
-        { value: digit, isFriend: true }         // Friends
-      ];
-    }
-
-    // Попытка многошаговой подготовки
-    const preparationSteps = this._generatePreparationSteps(
-      currentValue,
-      targetValue,
-      stepsRemaining - 1,
-      isFirst
-    );
-
-    if (preparationSteps && preparationSteps.length > 0) {
-      return [
-        ...preparationSteps,              // несколько шагов подготовки
-        { value: digit, isFriend: true }  // Friends
-      ];
-    }
-
-    return null;
-  }
-
-  /**
-   * Спланировать -digit по правилу Друзья
-   *
-   * Формула: -digit = -10 + friend, где friend = 10 - digit
-   */
-  _planSubtraction(digit, states, stepsRemaining) {
-    const position = 0;
-    const currentValue = states[position];
-
-    // Получаем требования для этой цифры
-    const requirements = this._getSubtractionRequirements(digit);
-
-    // Проверяем физическую возможность -10
-    if (!this._canSubtractTen(states, position)) {
-      return null; // Нечего занимать из следующего разряда
-    }
-
-    // Проверяем, можем ли применить Friends СЕЙЧАС
-    if (requirements.states.includes(currentValue)) {
-      const friend = 10 - digit;
-
-      // Дополнительная проверка: можем ли добавить friend?
-      if (this._canPlusDirect(currentValue, friend)) {
-        // Можем применить сразу!
-        return [{ value: -digit, isFriend: true }];
-      }
-    }
-
-    // Не можем применить сейчас - нужна подготовка
-    const targetValue = requirements.maxState;
-    const needToSubtract = currentValue - targetValue;
-
-    if (needToSubtract <= 0) {
-      return null; // Что-то не так
-    }
-
-    // Проверяем, хватает ли места для подготовки
-    if (stepsRemaining < 2) {
-      return null;
-    }
-
-    // Проверяем физическую возможность подготовки
-    if (!this._canMinusDirect(currentValue, needToSubtract)) {
-      return null; // Не можем подготовить напрямую
-    }
-
-    return [
-      { value: -needToSubtract, isFriend: false },  // подготовка
-      { value: -digit, isFriend: true }              // Friends
-    ];
-  }
-
-  /**
-   * Генерация нескольких подготовительных шагов для достижения целевого состояния
-   *
-   * Используется когда за одно действие не получается достичь нужного состояния
-   */
-  _generatePreparationSteps(currentValue, targetValue, maxSteps, isFirst) {
-    if (maxSteps < 1) return null;
-
-    const diff = targetValue - currentValue;
-    if (diff === 0) return [];
-
-    const steps = [];
-    let value = currentValue;
-    const simpleDigits = [...this.config.simpleDigits].sort((a, b) => b - a); // По убыванию
-
-    let remaining = diff;
-
-    while (remaining > 0 && steps.length < maxSteps) {
-      // Выбираем максимально возможное действие из доступных
-      let bestAction = null;
-
-      for (const digit of simpleDigits) {
-        if (digit <= remaining && this._canPlusDirect(value, digit)) {
-          bestAction = digit;
-          break;
-        }
-      }
-
-      if (!bestAction) break;
-
-      steps.push({ value: bestAction, isFriend: false });
-      value += bestAction;
-      remaining -= bestAction;
-    }
-
-    // Проверяем, достигли ли цели
-    if (remaining === 0) {
-      return steps;
-    }
-
-    return null; // Не удалось подготовить
-  }
-
   // ========== СЕКЦИЯ 5: ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========
-
-  /**
-   * Сгенерировать простое (не-Friends) действие для разнообразия
-   */
-  _generateSimpleAction(states, isFirst) {
-    const currentValue = states[0];
-    const availableActions = [];
-
-    for (const digit of this.config.simpleDigits) {
-      // +digit
-      if (isFirst || digit > 0) {
-        if (this._canPlusDirect(currentValue, digit)) {
-          availableActions.push(digit);
-        }
-      }
-
-      // -digit
-      if (!isFirst) {
-        if (this._canMinusDirect(currentValue, digit)) {
-          availableActions.push(-digit);
-        }
-      }
-    }
-
-    if (availableActions.length === 0) {
-      return null;
-    }
-
-    const action = availableActions[Math.floor(Math.random() * availableActions.length)];
-    return { value: action, isFriend: false };
-  }
-
-  /**
-   * Применить действие к состоянию абакуса
-   *
-   * @param {number[]} states - массив разрядов
-   * @param {Object} actionObj - {value, isFriend}
-   * @returns {number[]} - новое состояние или null
-   */
-  _applyAction(states, actionObj) {
-    const newStates = [...states];
-    const value = actionObj.value;
-    const isFriend = actionObj.isFriend;
-
-    if (!isFriend) {
-      // Простое действие: только первый разряд
-      newStates[0] += value;
-
-      if (newStates[0] < 0 || newStates[0] > 9) {
-        return null; // Невалидно
-      }
-    } else {
-      // Friends действие: перенос между разрядами
-      const friend = 10 - Math.abs(value);
-      const isAddition = value > 0;
-
-      if (isAddition) {
-        // +n = +10 - friend
-        newStates[1] += 1;        // +10 к следующему разряду
-        newStates[0] -= friend;   // -friend к текущему разряду
-      } else {
-        // -n = -10 + friend
-        newStates[1] -= 1;        // -10 из следующего разряда
-        newStates[0] += friend;   // +friend к текущему разряду
-      }
-
-      // Проверка валидности всех разрядов
-      for (let i = 0; i < newStates.length; i++) {
-        if (newStates[i] < 0 || newStates[i] > 9) {
-          return null;
-        }
-      }
-    }
-
-    return newStates;
-  }
-
-  /**
-   * Проверка валидности состояния
-   */
-  _isValidState(states) {
-    for (let i = 0; i < states.length; i++) {
-      if (states[i] < 0 || states[i] > 9) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Проверка переполнения разрядности
-   */
-  _checkOverflow(states) {
-    // Проверяем, что все разряды ВЫШЕ digitCount равны 0
-    for (let i = this.config.digitCount; i < states.length; i++) {
-      if (states[i] !== 0) {
-        return true; // Есть переполнение!
-      }
-    }
-    return false;
-  }
 
   /**
    * Преобразовать состояние в число
@@ -902,8 +1180,8 @@ export class FriendsExampleGenerator {
     if (!Array.isArray(state)) return 0;
 
     let result = 0;
-    for (let i = 0; i < this.config.digitCount && i < state.length; i++) {
-      result += state[i] * Math.pow(10, i);
+    for (let i = 0; i < state.length; i++) {
+      result += (state[i] || 0) * Math.pow(10, i);
     }
 
     return result;
