@@ -1070,14 +1070,21 @@ export class FriendsExampleGenerator {
     while (friendsAdded < maxFriends && steps.length < targetSteps - 2) {
       console.log(`\n🔄 Попытка ${friendsAdded + 1} Friends...`);
 
-      // ШАГ 2.1: АГРЕССИВНО подготавливаем единицы к нужному состоянию
+      // ШАГ 2.1: Выбираем СЛУЧАЙНОЕ целевое значение единиц из диапазона
+      // Минимум: requiredFirstVal, Максимум: 9
+      // Это добавляет РАЗНООБРАЗИЕ - единицы могут быть не только requiredFirstVal!
+      const targetFirstVal = Math.floor(Math.random() * (9 - requiredFirstVal + 1)) + requiredFirstVal;
+      console.log(`🎲 Целевое состояние единиц: ${targetFirstVal} (диапазон: ${requiredFirstVal}-9)`);
+      console.log(`   После Friends останется: ${targetFirstVal - (10 - friendDigit)} бусин`);
+
+      // ШАГ 2.2: АГРЕССИВНО подготавливаем единицы к целевому состоянию
     let maxIterations = 20;
-    while ((states[0] || 0) !== requiredFirstVal && steps.length < targetSteps - 1 && maxIterations-- > 0) {
+    while ((states[0] || 0) !== targetFirstVal && steps.length < targetSteps - 1 && maxIterations-- > 0) {
       const currentFirst = states[0] || 0;
 
       // Если нужно ДОБАВИТЬ
-      if (currentFirst < requiredFirstVal) {
-        const remaining = requiredFirstVal - currentFirst;
+      if (currentFirst < targetFirstVal) {
+        const remaining = targetFirstVal - currentFirst;
 
         // Пробуем добавить МАКСИМАЛЬНО ВОЗМОЖНОЕ: 9, 8, 7, 6, 5, 4, 3, 2, 1
         let added = false;
@@ -1104,9 +1111,9 @@ export class FriendsExampleGenerator {
 
         if (!added) {
           // Прямой путь невозможен - пробуем ОБХОДНОЙ путь через 9
-          console.warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${requiredFirstVal}. Пробуем через 9...`);
+          console.warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${targetFirstVal}. Пробуем через 9...`);
 
-          // Путь: current → 9 → required
+          // Путь: current → 9 → target
           const toNine = 9 - currentFirst;
           if (toNine > 0 && this._canPlusDirect(currentFirst, toNine) && steps.length < targetSteps - 2) {
             // Шаг 1: current → 9
@@ -1120,8 +1127,8 @@ export class FriendsExampleGenerator {
               states = newStates1;
               console.log(`🔄 Обходной путь (шаг 1): +${toNine} → 9, состояние: [${newStates1.join(', ')}]`);
 
-              // Шаг 2: 9 → required
-              const fromNine = 9 - requiredFirstVal;
+              // Шаг 2: 9 → target
+              const fromNine = 9 - targetFirstVal;
               if (fromNine > 0 && this._canMinusDirect(9, fromNine)) {
                 const newStates2 = this._applyAction(states, { value: -fromNine, isFriend: false });
                 if (newStates2 && this._isValidState(newStates2)) {
@@ -1132,21 +1139,21 @@ export class FriendsExampleGenerator {
                   });
                   states = newStates2;
                   added = true;
-                  console.log(`🔄 Обходной путь (шаг 2): -${fromNine} → ${requiredFirstVal}, состояние: [${newStates2.join(', ')}]`);
+                  console.log(`🔄 Обходной путь (шаг 2): -${fromNine} → ${targetFirstVal}, состояние: [${newStates2.join(', ')}]`);
                 }
               }
             }
           }
 
           if (!added) {
-            console.error(`❌ Невозможно подготовить единицы: ${currentFirst}→${requiredFirstVal}`);
+            console.error(`❌ Невозможно подготовить единицы: ${currentFirst}→${targetFirstVal}`);
             break;
           }
         }
       }
       // Если нужно УБРАТЬ
-      else if (currentFirst > requiredFirstVal) {
-        const toRemove = currentFirst - requiredFirstVal;
+      else if (currentFirst > targetFirstVal) {
+        const toRemove = currentFirst - targetFirstVal;
 
         // Пробуем убрать МАКСИМАЛЬНО ВОЗМОЖНОЕ: 9, 8, 7, 6, 5, 4, 3, 2, 1
         let removed = false;
@@ -1173,9 +1180,9 @@ export class FriendsExampleGenerator {
 
         if (!removed) {
           // Прямой путь невозможен - пробуем ОБХОДНОЙ путь через 0
-          console.warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${requiredFirstVal}. Пробуем через 0...`);
+          console.warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${targetFirstVal}. Пробуем через 0...`);
 
-          // Путь: current → 0 → required
+          // Путь: current → 0 → target
           if (currentFirst > 0 && this._canMinusDirect(currentFirst, currentFirst) && steps.length < targetSteps - 2) {
             // Шаг 1: current → 0
             const newStates1 = this._applyAction(states, { value: -currentFirst, isFriend: false });
@@ -1188,37 +1195,37 @@ export class FriendsExampleGenerator {
               states = newStates1;
               console.log(`🔄 Обходной путь (шаг 1): -${currentFirst} → 0, состояние: [${newStates1.join(', ')}]`);
 
-              // Шаг 2: 0 → required
-              if (requiredFirstVal > 0 && this._canPlusDirect(0, requiredFirstVal)) {
-                const newStates2 = this._applyAction(states, { value: requiredFirstVal, isFriend: false });
+              // Шаг 2: 0 → target
+              if (targetFirstVal > 0 && this._canPlusDirect(0, targetFirstVal)) {
+                const newStates2 = this._applyAction(states, { value: targetFirstVal, isFriend: false });
                 if (newStates2 && this._isValidState(newStates2)) {
                   steps.push({
-                    action: requiredFirstVal,
+                    action: targetFirstVal,
                     isFriend: false,
                     states: [...newStates2]
                   });
                   states = newStates2;
                   removed = true;
-                  console.log(`🔄 Обходной путь (шаг 2): +${requiredFirstVal} → ${requiredFirstVal}, состояние: [${newStates2.join(', ')}]`);
+                  console.log(`🔄 Обходной путь (шаг 2): +${targetFirstVal} → ${targetFirstVal}, состояние: [${newStates2.join(', ')}]`);
                 }
               }
             }
           }
 
           if (!removed) {
-            console.error(`❌ Невозможно подготовить единицы: ${currentFirst}→${requiredFirstVal}`);
+            console.error(`❌ Невозможно подготовить единицы: ${currentFirst}→${targetFirstVal}`);
             break;
           }
         }
       }
     }
 
-      console.log(`🔧 Подготовка завершена: единицы = ${states[0]}, нужно = ${requiredFirstVal}`);
+      console.log(`🔧 Подготовка завершена: единицы = ${states[0]}, целевое = ${targetFirstVal}`);
 
-      // ШАГ 2.2: Применяем Friends действие (ОДНОЗНАЧНОЕ!)
+      // ШАГ 2.3: Применяем Friends действие (ОДНОЗНАЧНОЕ!)
       const currentFirst = states[0] || 0;
 
-      if (currentFirst === requiredFirstVal && steps.length < targetSteps) {
+      if (currentFirst >= requiredFirstVal && steps.length < targetSteps) {
         // Применяем Friends ВРУЧНУЮ к единицам: +friendDigit = +10 - friend
         const friend = 10 - friendDigit;
         const newStates = [...states];
@@ -1280,7 +1287,7 @@ export class FriendsExampleGenerator {
           }
         }
       } else {
-        console.warn(`⚠️ Единицы НЕ подготовлены! Текущее=${currentFirst}, нужно=${requiredFirstVal}`);
+        console.warn(`⚠️ Единицы НЕ подготовлены! Текущее=${currentFirst}, требуется минимум ${requiredFirstVal}, целевое было ${targetFirstVal}`);
         break; // Прерываем цикл Friends, если не можем подготовить
       }
     }
