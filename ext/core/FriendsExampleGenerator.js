@@ -1071,11 +1071,24 @@ export class FriendsExampleGenerator {
       console.log(`\n🔄 Попытка ${friendsAdded + 1} Friends...`);
 
       // ШАГ 2.1: Выбираем СЛУЧАЙНОЕ целевое значение единиц из диапазона
-      // Минимум: requiredFirstVal, Максимум: 9
-      // Это добавляет РАЗНООБРАЗИЕ - единицы могут быть не только requiredFirstVal!
-      const targetFirstVal = Math.floor(Math.random() * (9 - requiredFirstVal + 1)) + requiredFirstVal;
-      console.log(`🎲 Целевое состояние единиц: ${targetFirstVal} (диапазон: ${requiredFirstVal}-9)`);
-      console.log(`   После Friends останется: ${targetFirstVal - (10 - friendDigit)} бусин`);
+      // НО ВАЖНО: вычитание friend должно быть возможно по правилу Просто!
+      // Ищем валидные состояния в диапазоне [requiredFirstVal, 9]
+      const friend = 10 - friendDigit;
+      const validTargets = [];
+      for (let v = requiredFirstVal; v <= 9; v++) {
+        if (this._canMinusDirect(v, friend)) {
+          validTargets.push(v);
+        }
+      }
+
+      if (validTargets.length === 0) {
+        console.error(`❌ Нет валидных целевых состояний для friend=${friend} в диапазоне [${requiredFirstVal}, 9]!`);
+        break;
+      }
+
+      const targetFirstVal = validTargets[Math.floor(Math.random() * validTargets.length)];
+      console.log(`🎲 Целевое состояние единиц: ${targetFirstVal} (валидные: [${validTargets.join(', ')}])`);
+      console.log(`   После Friends останется: ${targetFirstVal - friend} бусин`);
 
       // ШАГ 2.2: АГРЕССИВНО подготавливаем единицы к целевому состоянию
     let maxIterations = 20;
@@ -1224,10 +1237,12 @@ export class FriendsExampleGenerator {
 
       // ШАГ 2.3: Применяем Friends действие (ОДНОЗНАЧНОЕ!)
       const currentFirst = states[0] || 0;
+      // friend уже объявлен выше в строке 1076
 
-      if (currentFirst >= requiredFirstVal && steps.length < targetSteps) {
+      // КРИТИЧЕСКАЯ ПРОВЕРКА: можно ли вычесть friend по правилу Просто?
+      // Например, из 6 (U=1,L=1) вычесть -2 НЕЛЬЗЯ по Просто (это МИКС!)
+      if (currentFirst >= requiredFirstVal && this._canMinusDirect(currentFirst, friend) && steps.length < targetSteps) {
         // Применяем Friends ВРУЧНУЮ к единицам: +friendDigit = +10 - friend
-        const friend = 10 - friendDigit;
         const newStates = [...states];
 
         // Формула: +n = +10 - friend
@@ -1235,7 +1250,7 @@ export class FriendsExampleGenerator {
         if (newStates.length < 2) newStates.push(0);
         newStates[1] = (newStates[1] || 0) + 1;
 
-        // 2. Вычитаем friend из единиц
+        // 2. Вычитаем friend из единиц (проверили, что это возможно по Просто!)
         newStates[0] = (newStates[0] || 0) - friend;
 
         if (this._isValidState(newStates) && !this._checkOverflow(newStates)) {
@@ -1287,7 +1302,13 @@ export class FriendsExampleGenerator {
           }
         }
       } else {
-        console.warn(`⚠️ Единицы НЕ подготовлены! Текущее=${currentFirst}, требуется минимум ${requiredFirstVal}, целевое было ${targetFirstVal}`);
+        // Проверяем причину отказа
+        if (currentFirst < requiredFirstVal) {
+          console.warn(`⚠️ Недостаточно бусин! Текущее=${currentFirst}, требуется минимум ${requiredFirstVal}`);
+        } else if (!this._canMinusDirect(currentFirst, friend)) {
+          console.warn(`⚠️ Невозможно вычесть friend=${friend} из ${currentFirst} по правилу Просто (будет МИКС)!`);
+          console.warn(`   Для friend=${friend} валидные состояния: те, где вычитание -${friend} однонаправленное`);
+        }
         break; // Прерываем цикл Friends, если не можем подготовить
       }
     }
