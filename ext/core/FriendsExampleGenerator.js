@@ -1239,8 +1239,13 @@ export class FriendsExampleGenerator {
       }
     }
 
-    // ШАГ 3: Заполняем оставшиеся шаги РАЗНООБРАЗНЫМИ простыми действиями
-    const simpleActions = [1, 2, 3, 4, 1, 2]; // Чередование для разнообразия
+    // ШАГ 4: Заполняем оставшиеся шаги РАЗНООБРАЗНЫМИ простыми действиями
+    // Создаем РАНДОМНЫЙ массив действий для каждого примера
+    const simpleActions = [];
+    for (let i = 0; i < 10; i++) {
+      simpleActions.push(Math.floor(Math.random() * 4) + 1); // Случайное от 1 до 4
+    }
+
     let actionIndex = 0;
     let failedAttempts = 0;
     const maxFailedAttempts = 50;
@@ -1249,37 +1254,76 @@ export class FriendsExampleGenerator {
       const firstVal = states[0] || 0;
       const val = simpleActions[actionIndex % simpleActions.length];
 
-      // Пробуем добавить к единицам
-      if (firstVal + val <= 9 && this._canPlusDirect(firstVal, val)) {
-        const newStates = this._applyAction(states, { value: val, isFriend: false });
+      // Случайный выбор: сначала сложение или вычитание?
+      const tryAdditionFirst = Math.random() < 0.5;
 
-        if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
-          steps.push({
-            action: val,
-            isFriend: false,
-            states: [...newStates]
-          });
-          states = newStates;
-          actionIndex++;
-          failedAttempts = 0;
-          continue;
+      if (tryAdditionFirst) {
+        // Пробуем добавить к единицам
+        if (firstVal + val <= 9 && this._canPlusDirect(firstVal, val)) {
+          const newStates = this._applyAction(states, { value: val, isFriend: false });
+
+          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+            steps.push({
+              action: val,
+              isFriend: false,
+              states: [...newStates]
+            });
+            states = newStates;
+            actionIndex++;
+            failedAttempts = 0;
+            continue;
+          }
         }
-      }
 
-      // Если не можем добавить - пробуем вычитание
-      if (firstVal > 0 && firstVal >= val && this._canMinusDirect(firstVal, val)) {
-        const newStates = this._applyAction(states, { value: -val, isFriend: false });
+        // Если не можем добавить - пробуем вычитание
+        if (firstVal > 0 && firstVal >= val && this._canMinusDirect(firstVal, val)) {
+          const newStates = this._applyAction(states, { value: -val, isFriend: false });
 
-        if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
-          steps.push({
-            action: -val,
-            isFriend: false,
-            states: [...newStates]
-          });
-          states = newStates;
-          actionIndex++;
-          failedAttempts = 0;
-          continue;
+          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+            steps.push({
+              action: -val,
+              isFriend: false,
+              states: [...newStates]
+            });
+            states = newStates;
+            actionIndex++;
+            failedAttempts = 0;
+            continue;
+          }
+        }
+      } else {
+        // Пробуем вычитание первым
+        if (firstVal > 0 && firstVal >= val && this._canMinusDirect(firstVal, val)) {
+          const newStates = this._applyAction(states, { value: -val, isFriend: false });
+
+          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+            steps.push({
+              action: -val,
+              isFriend: false,
+              states: [...newStates]
+            });
+            states = newStates;
+            actionIndex++;
+            failedAttempts = 0;
+            continue;
+          }
+        }
+
+        // Если не можем вычесть - пробуем добавить
+        if (firstVal + val <= 9 && this._canPlusDirect(firstVal, val)) {
+          const newStates = this._applyAction(states, { value: val, isFriend: false });
+
+          if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+            steps.push({
+              action: val,
+              isFriend: false,
+              states: [...newStates]
+            });
+            states = newStates;
+            actionIndex++;
+            failedAttempts = 0;
+            continue;
+          }
         }
       }
 
