@@ -1055,22 +1055,12 @@ export class FriendsExampleGenerator {
     console.log(`🎯 Цель: friendDigit=${friendDigit}, нужно состояние единиц=${requiredFirstVal}`);
     console.log(`🎯 Планируем Friends: минимум ${minFriends}, максимум ${maxFriends}`);
 
-    // ШАГ 1: Умное начало - начинаем с состояния, из которого ЛЕГКО дойти до цели
-    // Без Brothers переход через 5 невозможен по правилу Просто
-    // Поэтому начинаем либо с 0-4 (если цель 0-4), либо с 5-9 (если цель 5-9)
+    // ШАГ 1: Умное начало - начинаем с МАЛЕНЬКОГО действия из разрешенных simpleDigits
+    // Многошаговая подготовка сама доведет до нужного состояния
     if (steps.length < targetSteps - 1) {
-      let smartStart;
-
-      if (requiredFirstVal <= 4) {
-        // Цель в нижнем диапазоне [0-4] - начинаем с малого действия
-        smartStart = Math.min(requiredFirstVal, maxSimpleDigit);
-      } else {
-        // Цель в верхнем диапазоне [5-9] - начинаем с 5 или выше
-        // Чтобы избежать перехода через 5, начинаем минимум с 5
-        smartStart = Math.max(5, requiredFirstVal - maxSimpleDigit);
-        // Но не больше 9
-        smartStart = Math.min(9, smartStart);
-      }
+      // Выбираем минимальное действие из simpleDigits
+      const minSimpleDigit = Math.min(...this.config.simpleDigits);
+      const smartStart = minSimpleDigit;
 
       if (smartStart > 0) {
         const newStates = this._applyAction(states, { value: smartStart, isFriend: false });
@@ -1081,7 +1071,7 @@ export class FriendsExampleGenerator {
             states: [...newStates]
           });
           states = newStates;
-          console.log(`🎯 Умное начало: +${smartStart}, состояние: [${newStates.join(', ')}] (цель ${requiredFirstVal}, без перехода через 5)`);
+          console.log(`🎯 Умное начало: +${smartStart} (из simpleDigits), состояние: [${newStates.join(', ')}]`);
         }
       }
     }
