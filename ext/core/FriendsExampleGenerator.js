@@ -1036,10 +1036,16 @@ export class FriendsExampleGenerator {
 
     console.log(`⚠️ Используем fallback генерацию для ${targetSteps} шагов`);
 
-    // Используем первую выбранную цифру
-    const friendDigit = this.config.selectedDigits[0] || 1;
+    // Выбираем СЛУЧАЙНУЮ цифру Friends из selectedDigits
+    const friendDigit = this.config.selectedDigits[Math.floor(Math.random() * this.config.selectedDigits.length)] || 1;
     const requiredFirstVal = 10 - friendDigit; // Для digit=1 нужно 9, для digit=9 нужно 1
     let friendsAdded = 0;
+
+    // Максимальная разрешенная цифра для простых действий
+    const maxSimpleDigit = Math.max(...this.config.simpleDigits);
+
+    // Массив разрешенных цифр в порядке убывания (для поиска максимального подходящего действия)
+    const simpleDigitsDesc = [...this.config.simpleDigits].sort((a, b) => b - a);
 
     // Динамическое количество Friends в зависимости от количества шагов
     // Примерно 1 Friends на каждые 3-4 шага
@@ -1051,7 +1057,8 @@ export class FriendsExampleGenerator {
 
     // ШАГ 1: Случайное начало (первое действие)
     if (steps.length < targetSteps - 1) {
-      const randomStart = Math.floor(Math.random() * 4) + 1; // +1 до +4
+      // Выбираем случайное действие из разрешенных simpleDigits
+      const randomStart = this.config.simpleDigits[Math.floor(Math.random() * this.config.simpleDigits.length)];
       const newStates = this._applyAction(states, { value: randomStart, isFriend: false });
 
       if (newStates && this._isValidState(newStates)) {
@@ -1099,9 +1106,10 @@ export class FriendsExampleGenerator {
       if (currentFirst < targetFirstVal) {
         const remaining = targetFirstVal - currentFirst;
 
-        // Пробуем добавить МАКСИМАЛЬНО ВОЗМОЖНОЕ: 9, 8, 7, 6, 5, 4, 3, 2, 1
+        // Пробуем добавить МАКСИМАЛЬНО ВОЗМОЖНОЕ из разрешенных simpleDigits
         let added = false;
-        for (let tryAdd = Math.min(9, remaining); tryAdd >= 1; tryAdd--) {
+        for (const tryAdd of simpleDigitsDesc) {
+          if (tryAdd > remaining) continue; // Слишком большое действие
           if (currentFirst + tryAdd > 9) continue; // Переполнение
 
           // Проверяем: можем ли добавить по правилу Просто?
@@ -1128,7 +1136,8 @@ export class FriendsExampleGenerator {
 
           // Путь: current → 9 → target
           const toNine = 9 - currentFirst;
-          if (toNine > 0 && this._canPlusDirect(currentFirst, toNine) && steps.length < targetSteps - 2) {
+          // ВАЖНО: проверяем, что действие toNine входит в разрешенные simpleDigits
+          if (toNine > 0 && simpleDigitsDesc.includes(toNine) && this._canPlusDirect(currentFirst, toNine) && steps.length < targetSteps - 2) {
             // Шаг 1: current → 9
             const newStates1 = this._applyAction(states, { value: toNine, isFriend: false });
             if (newStates1 && this._isValidState(newStates1)) {
@@ -1142,7 +1151,8 @@ export class FriendsExampleGenerator {
 
               // Шаг 2: 9 → target
               const fromNine = 9 - targetFirstVal;
-              if (fromNine > 0 && this._canMinusDirect(9, fromNine)) {
+              // ВАЖНО: проверяем, что действие fromNine входит в разрешенные simpleDigits
+              if (fromNine > 0 && simpleDigitsDesc.includes(fromNine) && this._canMinusDirect(9, fromNine)) {
                 const newStates2 = this._applyAction(states, { value: -fromNine, isFriend: false });
                 if (newStates2 && this._isValidState(newStates2)) {
                   steps.push({
@@ -1168,9 +1178,10 @@ export class FriendsExampleGenerator {
       else if (currentFirst > targetFirstVal) {
         const toRemove = currentFirst - targetFirstVal;
 
-        // Пробуем убрать МАКСИМАЛЬНО ВОЗМОЖНОЕ: 9, 8, 7, 6, 5, 4, 3, 2, 1
+        // Пробуем убрать МАКСИМАЛЬНО ВОЗМОЖНОЕ из разрешенных simpleDigits
         let removed = false;
-        for (let trySub = Math.min(9, toRemove, currentFirst); trySub >= 1; trySub--) {
+        for (const trySub of simpleDigitsDesc) {
+          if (trySub > toRemove) continue; // Слишком большое действие
           if (currentFirst - trySub < 0) continue; // Нельзя уйти в минус
 
           // Проверяем: можем ли убрать по правилу Просто?
@@ -1196,7 +1207,8 @@ export class FriendsExampleGenerator {
           console.warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${targetFirstVal}. Пробуем через 0...`);
 
           // Путь: current → 0 → target
-          if (currentFirst > 0 && this._canMinusDirect(currentFirst, currentFirst) && steps.length < targetSteps - 2) {
+          // ВАЖНО: проверяем, что действие currentFirst входит в разрешенные simpleDigits
+          if (currentFirst > 0 && simpleDigitsDesc.includes(currentFirst) && this._canMinusDirect(currentFirst, currentFirst) && steps.length < targetSteps - 2) {
             // Шаг 1: current → 0
             const newStates1 = this._applyAction(states, { value: -currentFirst, isFriend: false });
             if (newStates1 && this._isValidState(newStates1)) {
@@ -1209,7 +1221,8 @@ export class FriendsExampleGenerator {
               console.log(`🔄 Обходной путь (шаг 1): -${currentFirst} → 0, состояние: [${newStates1.join(', ')}]`);
 
               // Шаг 2: 0 → target
-              if (targetFirstVal > 0 && this._canPlusDirect(0, targetFirstVal)) {
+              // ВАЖНО: проверяем, что действие targetFirstVal входит в разрешенные simpleDigits
+              if (targetFirstVal > 0 && simpleDigitsDesc.includes(targetFirstVal) && this._canPlusDirect(0, targetFirstVal)) {
                 const newStates2 = this._applyAction(states, { value: targetFirstVal, isFriend: false });
                 if (newStates2 && this._isValidState(newStates2)) {
                   steps.push({
@@ -1269,7 +1282,8 @@ export class FriendsExampleGenerator {
           const simpleStepsAfter = friendsAdded < maxFriends ? (Math.floor(Math.random() * 2) + 1) : 0; // 1-2 шага, или 0 если это последний Friends
           for (let i = 0; i < simpleStepsAfter && steps.length < targetSteps - 1; i++) {
             const currentVal = states[0] || 0;
-            const randomAction = Math.floor(Math.random() * 3) + 1; // +1 до +3
+            // Выбираем случайное действие из разрешенных simpleDigits
+            const randomAction = this.config.simpleDigits[Math.floor(Math.random() * this.config.simpleDigits.length)];
 
             // Пробуем добавить
             if (currentVal + randomAction <= 9 && this._canPlusDirect(currentVal, randomAction)) {
@@ -1321,10 +1335,10 @@ export class FriendsExampleGenerator {
     }
 
     // ШАГ 4: Заполняем оставшиеся шаги РАЗНООБРАЗНЫМИ простыми действиями
-    // Создаем РАНДОМНЫЙ массив действий для каждого примера
+    // Создаем РАНДОМНЫЙ массив действий для каждого примера из разрешенных simpleDigits
     const simpleActions = [];
     for (let i = 0; i < 10; i++) {
-      simpleActions.push(Math.floor(Math.random() * 4) + 1); // Случайное от 1 до 4
+      simpleActions.push(this.config.simpleDigits[Math.floor(Math.random() * this.config.simpleDigits.length)]);
     }
 
     let actionIndex = 0;
@@ -1432,14 +1446,14 @@ export class FriendsExampleGenerator {
         }
       }
 
-      // Последняя попытка: +1 если возможно
-      if (firstVal < 9) {
-        const newStates = [...states];
-        newStates[0]++;
+      // Последняя попытка: минимальное действие из simpleDigits если возможно
+      const minSimpleDigit = Math.min(...this.config.simpleDigits);
+      if (firstVal + minSimpleDigit <= 9 && this._canPlusDirect(firstVal, minSimpleDigit)) {
+        const newStates = this._applyAction(states, { value: minSimpleDigit, isFriend: false });
 
-        if (this._isValidState(newStates)) {
+        if (newStates && this._isValidState(newStates)) {
           steps.push({
-            action: 1,
+            action: minSimpleDigit,
             isFriend: false,
             states: [...newStates]
           });
@@ -1463,17 +1477,22 @@ export class FriendsExampleGenerator {
     // Обрезаем или дополняем до точного количества
     const finalSteps = steps.slice(0, targetSteps);
 
-    // Если не хватает шагов - дополняем простыми +1
+    // Если не хватает шагов - дополняем минимальным действием из simpleDigits
+    const minSimpleDigit = Math.min(...this.config.simpleDigits);
     while (finalSteps.length < targetSteps) {
       const firstVal = states[0] || 0;
-      if (firstVal < 9) {
-        states = [...states];
-        states[0]++;
-        finalSteps.push({
-          action: 1,
-          isFriend: false,
-          states: [...states]
-        });
+      if (firstVal + minSimpleDigit <= 9) {
+        const newStates = this._applyAction(states, { value: minSimpleDigit, isFriend: false });
+        if (newStates && this._isValidState(newStates)) {
+          finalSteps.push({
+            action: minSimpleDigit,
+            isFriend: false,
+            states: [...newStates]
+          });
+          states = newStates;
+        } else {
+          break;
+        }
       } else {
         break;
       }
