@@ -23,7 +23,7 @@ export function buildGeneratorSettingsFromSettings(st = {}) {
   const selectedDigits =
     blockSimpleDigits.length > 0
       ? blockSimpleDigits.map((d) => parseInt(d, 10))
-      : [1, 2, 3, 4];
+      : [1, 2, 3, 4, 5, 6, 7, 8, 9]; // Все однозначные цифры по умолчанию
 
   // === КОЛИЧЕСТВО ДЕЙСТВИЙ ===
   const genMin =
