@@ -1036,9 +1036,6 @@ export class FriendsExampleGenerator {
 
     console.log(`⚠️ Используем fallback генерацию для ${targetSteps} шагов`);
 
-    // Выбираем СЛУЧАЙНУЮ цифру Friends из selectedDigits
-    const friendDigit = this.config.selectedDigits[Math.floor(Math.random() * this.config.selectedDigits.length)] || 1;
-    const requiredFirstVal = 10 - friendDigit; // Для digit=1 нужно 9, для digit=9 нужно 1
     let friendsAdded = 0;
 
     // Максимальная разрешенная цифра для простых действий
@@ -1052,15 +1049,17 @@ export class FriendsExampleGenerator {
     const minFriends = Math.max(1, Math.floor(targetSteps / 4));
     const maxFriends = Math.max(2, Math.floor(targetSteps / 3));
 
-    console.log(`🎯 Цель: friendDigit=${friendDigit}, нужно состояние единиц=${requiredFirstVal}`);
+    console.log(`🎯 Выбранные Friends цифры: [${this.config.selectedDigits.join(', ')}]`);
     console.log(`🎯 Планируем Friends: минимум ${minFriends}, максимум ${maxFriends}`);
 
-    // ШАГ 1: Умное начало - начинаем с МАЛЕНЬКОГО действия из разрешенных simpleDigits
+    // ШАГ 1: Умное начало - СЛУЧАЙНОЕ маленькое действие из simpleDigits
     // Многошаговая подготовка сама доведет до нужного состояния
     if (steps.length < targetSteps - 1) {
-      // Выбираем минимальное действие из simpleDigits
-      const minSimpleDigit = Math.min(...this.config.simpleDigits);
-      const smartStart = minSimpleDigit;
+      // Выбираем случайное действие из simpleDigits (небольшое, чтобы не переполнить)
+      const availableSmallDigits = this.config.simpleDigits.filter(d => d <= 4);
+      const smartStart = availableSmallDigits.length > 0
+        ? availableSmallDigits[Math.floor(Math.random() * availableSmallDigits.length)]
+        : this.config.simpleDigits[Math.floor(Math.random() * this.config.simpleDigits.length)];
 
       if (smartStart > 0) {
         const newStates = this._applyAction(states, { value: smartStart, isFriend: false });
@@ -1071,7 +1070,7 @@ export class FriendsExampleGenerator {
             states: [...newStates]
           });
           states = newStates;
-          console.log(`🎯 Умное начало: +${smartStart} (из simpleDigits), состояние: [${newStates.join(', ')}]`);
+          console.log(`🎯 Случайное начало: +${smartStart} (из simpleDigits), состояние: [${newStates.join(', ')}]`);
         }
       }
     }
@@ -1080,6 +1079,11 @@ export class FriendsExampleGenerator {
     // Пытаемся добавить несколько Friends с простыми шагами между ними
     while (friendsAdded < maxFriends && steps.length < targetSteps - 2) {
       console.log(`\n🔄 Попытка ${friendsAdded + 1} Friends...`);
+
+      // Выбираем СЛУЧАЙНУЮ цифру Friends для РАЗНООБРАЗИЯ
+      const friendDigit = this.config.selectedDigits[Math.floor(Math.random() * this.config.selectedDigits.length)] || 1;
+      const requiredFirstVal = 10 - friendDigit; // Для digit=1 нужно 9, для digit=9 нужно 1
+      console.log(`  Выбрана Friends цифра: ${friendDigit} (нужно состояние единиц >= ${requiredFirstVal})`);
 
       // ШАГ 2.1: Выбираем СЛУЧАЙНОЕ целевое значение единиц из диапазона
       // НО ВАЖНО: вычитание friend должно быть возможно по правилу Просто!
