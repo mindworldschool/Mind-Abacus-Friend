@@ -103,7 +103,7 @@ export function generateExample(settings = {}) {
     ? blocks.simple.digits
         .map(n => parseInt(n, 10))
         .filter(n => Number.isFinite(n))
-    : [1, 2, 3, 4]; // дефолт если UI не прислал ничего
+    : [1, 2, 3, 4, 5, 6, 7, 8, 9]; // дефолт: все однозначные цифры
 
   // Уникализируем и сортируем для стабильности
   const selectedDigits = Array.from(new Set(originalDigits)).sort(
