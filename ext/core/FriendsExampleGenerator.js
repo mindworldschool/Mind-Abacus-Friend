@@ -72,6 +72,14 @@ export class FriendsExampleGenerator {
       this.config.digitCount = 2;
     }
 
+    // МИНИМУМ для правила Друзья: 4 шага
+    // Причина: нужно минимум 1-2 шага подготовки + 1 Friends + 1 заполнение
+    const MIN_STEPS_FOR_FRIENDS = 4;
+    if (this.config.stepsCount < MIN_STEPS_FOR_FRIENDS) {
+      console.warn(`⚠️ FriendsExampleGenerator: правило Друзья требует минимум ${MIN_STEPS_FOR_FRIENDS} шага! Было: ${this.config.stepsCount}, устанавливаем ${MIN_STEPS_FOR_FRIENDS}`);
+      this.config.stepsCount = MIN_STEPS_FOR_FRIENDS;
+    }
+
     // ЦЕЛЕВОЙ РАЗРЯД = самый старший (digitCount - 1)
     this.targetPosition = this.config.digitCount - 1;
 
