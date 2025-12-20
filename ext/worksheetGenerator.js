@@ -104,7 +104,14 @@ export function generateWorksheet(printConfig = {}) {
       id: i + 1,
       start: rawExample.start,
       steps: Array.isArray(rawExample.steps)
-        ? rawExample.steps.map((s) => String(s))
+        ? rawExample.steps.map((s) => {
+            // Если шаг - объект (Friends/Brothers), сохраняем его структуру
+            if (typeof s === 'object' && s !== null) {
+              return { ...s };
+            }
+            // Иначе преобразуем в строку
+            return String(s);
+          })
         : [],
       answer: Number(rawExample.answer)
     });
