@@ -66,12 +66,16 @@ export class FriendsExampleGenerator {
 
     // Валидация
     if (this.config.selectedDigits.length === 0) {
-      console.warn("⚠️ FriendsExampleGenerator: не выбрано ни одной цифры! Используем [1]");
+      if (!this.config.silent) {
+        console.warn("⚠️ FriendsExampleGenerator: не выбрано ни одной цифры! Используем [1]");
+      }
       this.config.selectedDigits = [1];
     }
 
     if (this.config.digitCount < 2) {
-      console.warn("⚠️ FriendsExampleGenerator: правило Друзья требует минимум 2 разряда! Устанавливаем 2");
+      if (!this.config.silent) {
+        console.warn("⚠️ FriendsExampleGenerator: правило Друзья требует минимум 2 разряда! Устанавливаем 2");
+      }
       this.config.digitCount = 2;
     }
 
@@ -79,7 +83,9 @@ export class FriendsExampleGenerator {
     // Причина: нужно минимум 1-2 шага подготовки + 1 Friends + 1 заполнение
     const MIN_STEPS_FOR_FRIENDS = 4;
     if (this.config.stepsCount < MIN_STEPS_FOR_FRIENDS) {
-      console.warn(`⚠️ FriendsExampleGenerator: правило Друзья требует минимум ${MIN_STEPS_FOR_FRIENDS} шага! Было: ${this.config.stepsCount}, устанавливаем ${MIN_STEPS_FOR_FRIENDS}`);
+      if (!this.config.silent) {
+        console.warn(`⚠️ FriendsExampleGenerator: правило Друзья требует минимум ${MIN_STEPS_FOR_FRIENDS} шага! Было: ${this.config.stepsCount}, устанавливаем ${MIN_STEPS_FOR_FRIENDS}`);
+      }
       this.config.stepsCount = MIN_STEPS_FOR_FRIENDS;
     }
 
@@ -519,7 +525,8 @@ export class FriendsExampleGenerator {
       return example;
     }
 
-    console.error(`❌ Не удалось сгенерировать пример за ${maxAttempts} попыток!`);
+    // Переход на fallback (не критическая ошибка - fallback всегда работает)
+    this._warn(`❌ Не удалось сгенерировать пример за ${maxAttempts} попыток!`);
     return this._fallbackExample();
   }
 
@@ -1131,7 +1138,7 @@ export class FriendsExampleGenerator {
       }
 
       if (validTargets.length === 0) {
-        console.error(`❌ Нет валидных целевых состояний для friend=${friend} в диапазоне [${requiredFirstVal}, 9]!`);
+        this._warn(`❌ Нет валидных целевых состояний для friend=${friend} в диапазоне [${requiredFirstVal}, 9]!`);
         break;
       }
 
@@ -1237,7 +1244,7 @@ export class FriendsExampleGenerator {
           }
 
           if (!added) {
-            console.error(`❌ Невозможно подготовить единицы: ${currentFirst}→${targetFirstVal}`);
+            this._warn(`❌ Невозможно подготовить единицы: ${currentFirst}→${targetFirstVal}`);
             break;
           }
         }
@@ -1335,7 +1342,7 @@ export class FriendsExampleGenerator {
           }
 
           if (!removed) {
-            console.error(`❌ Невозможно подготовить единицы: ${currentFirst}→${targetFirstVal}`);
+            this._warn(`❌ Невозможно подготовить единицы: ${currentFirst}→${targetFirstVal}`);
             break;
           }
         }
@@ -1416,12 +1423,12 @@ export class FriendsExampleGenerator {
       } else {
         // Проверяем причину отказа
         if (currentFirst !== targetFirstVal) {
-          console.warn(`⚠️ Не удалось достичь целевого состояния! Текущее=${currentFirst}, целевое=${targetFirstVal}`);
+          this._warn(`⚠️ Не удалось достичь целевого состояния! Текущее=${currentFirst}, целевое=${targetFirstVal}`);
         } else if (currentFirst < requiredFirstVal) {
-          console.warn(`⚠️ Недостаточно бусин! Текущее=${currentFirst}, требуется минимум ${requiredFirstVal}`);
+          this._warn(`⚠️ Недостаточно бусин! Текущее=${currentFirst}, требуется минимум ${requiredFirstVal}`);
         } else if (!this._canMinusDirect(currentFirst, friend)) {
-          console.warn(`⚠️ Невозможно вычесть friend=${friend} из ${currentFirst} по правилу Просто (будет МИКС)!`);
-          console.warn(`   Для friend=${friend} валидные состояния: те, где вычитание -${friend} однонаправленное`);
+          this._warn(`⚠️ Невозможно вычесть friend=${friend} из ${currentFirst} по правилу Просто (будет МИКС)!`);
+          this._warn(`   Для friend=${friend} валидные состояния: те, где вычитание -${friend} однонаправленное`);
         }
         break; // Прерываем цикл Friends, если не можем подготовить
       }
@@ -1429,7 +1436,7 @@ export class FriendsExampleGenerator {
 
     // Проверка: достигли ли минимального количества Friends
     if (friendsAdded < minFriends) {
-      console.error(`❌ КРИТИЧНО: Fallback не смог сгенерировать минимум ${minFriends} Friends! Сгенерировано: ${friendsAdded}`);
+      this._warn(`❌ КРИТИЧНО: Fallback не смог сгенерировать минимум ${minFriends} Friends! Сгенерировано: ${friendsAdded}`);
     } else {
       this._log(`✅ Успешно сгенерировано ${friendsAdded} Friends действий!`);
     }
@@ -1571,7 +1578,7 @@ export class FriendsExampleGenerator {
 
     // Если не хватает Friends, это критическая ошибка
     if (friendsAdded === 0) {
-      console.error(`❌ КРИТИЧНО: Fallback не смог сгенерировать ни одного Friends действия!`);
+      this._warn(`❌ КРИТИЧНО: Fallback не смог сгенерировать ни одного Friends действия!`);
     }
 
     // Обрезаем или дополняем до точного количества
