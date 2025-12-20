@@ -50,8 +50,14 @@ export function generateWorksheet(options = {}) {
   /** @type {WorksheetExample[]} */
   const examples = [];
 
+  // Добавляем флаг silent для подавления логов при генерации печати
+  const settingsForPrint = {
+    ...trainerSettings,
+    silent: true
+  };
+
   for (let i = 0; i < examplesCount; i++) {
-    const ex = generateExample(trainerSettings);
+    const ex = generateExample(settingsForPrint);
 
     if (!ex) {
       console.warn("[worksheet] generateExample вернул пустой результат, пропуск:", i);
@@ -61,7 +67,10 @@ export function generateWorksheet(options = {}) {
     examples.push({
       index: i + 1,
       start: ex.start,
-      steps: Array.isArray(ex.steps) ? ex.steps : [],
+      // Сохраняем структуру steps: строки остаются строками, объекты (Friends) копируются
+      steps: Array.isArray(ex.steps)
+        ? ex.steps.map(s => typeof s === 'object' && s !== null ? { ...s } : s)
+        : [],
       answer: ex.answer
     });
   }

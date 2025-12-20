@@ -381,7 +381,11 @@ export function openWorksheetPrintWindow(options = {}) {
         // Ячейки с числами для каждого примера - всегда 5 столбцов
         for (let col = 0; col < EXAMPLES_PER_TABLE; col++) {
           const ex = pageExamples[col];
-          const step = ex && ex.steps && ex.steps[row] ? String(ex.steps[row]) : '';
+          const stepData = ex && ex.steps && ex.steps[row];
+          // Для Friends/Brothers шагов (объекты) берем поле step, для обычных шагов (строки) используем как есть
+          const step = stepData
+            ? (typeof stepData === 'object' && stepData !== null ? stepData.step : String(stepData))
+            : '';
           doc.write(`<td class="examples-table__cell">${escapeHtml(step)}</td>`);
         }
 
