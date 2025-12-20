@@ -282,6 +282,7 @@ export function generateExample(settings = {}) {
         maxSteps: maxSteps,
         onlyAddition: blocks?.friends?.onlyAddition ?? false,
         onlySubtraction: blocks?.friends?.onlySubtraction ?? false,
+        silent: settings.silent || false,  // Передаем флаг тихого режима
         blocks: blocks
       });
 

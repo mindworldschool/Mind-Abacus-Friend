@@ -57,6 +57,9 @@ export class FriendsExampleGenerator {
       // Активен ли блок "Братья" (влияет на использование верхней бусины)
       brothersActive: config.blocks?.brothers?.active || false,
 
+      // Тихий режим (отключает детальное логирование fallback)
+      silent: config.silent || false,
+
       // Исходная конфигурация
       blocks: config.blocks || {}
     };
@@ -106,6 +109,23 @@ export class FriendsExampleGenerator {
   _getPositionName(pos) {
     const names = ['единицы', 'десятки', 'сотни', 'тысячи', 'десятки тысяч', 'сотни тысяч', 'миллионы'];
     return names[pos] || `разряд ${pos}`;
+  }
+
+  // Утилита для логирования с учетом флага silent
+  _log(...args) {
+    if (!this.config.silent) {
+      console.log(...args);
+    }
+  }
+
+  // Утилита для предупреждений (всегда выводятся)
+  _warn(...args) {
+    console.warn(...args);
+  }
+
+  // Утилита для ошибок (всегда выводятся)
+  _error(...args) {
+    console.error(...args);
   }
 
   // ========== СЕКЦИЯ 1: ФИЗИКА АБАКУСА ==========
@@ -1042,7 +1062,9 @@ export class FriendsExampleGenerator {
     let states = Array(this.config.digitCount).fill(0);
     const targetSteps = this.config.stepsCount;
 
-    console.log(`⚠️ Используем fallback генерацию для ${targetSteps} шагов`);
+    if (!this.config.silent) {
+      console.log(`⚠️ Используем fallback генерацию для ${targetSteps} шагов`);
+    }
 
     let friendsAdded = 0;
 
@@ -1057,8 +1079,10 @@ export class FriendsExampleGenerator {
     const minFriends = Math.max(1, Math.floor(targetSteps / 4));
     const maxFriends = Math.max(2, Math.floor(targetSteps / 3));
 
-    console.log(`🎯 Выбранные Friends цифры: [${this.config.selectedDigits.join(', ')}]`);
-    console.log(`🎯 Планируем Friends: минимум ${minFriends}, максимум ${maxFriends}`);
+    if (!this.config.silent) {
+      console.log(`🎯 Выбранные Friends цифры: [${this.config.selectedDigits.join(', ')}]`);
+      console.log(`🎯 Планируем Friends: минимум ${minFriends}, максимум ${maxFriends}`);
+    }
 
     // ШАГ 1: Умное начало - СЛУЧАЙНОЕ маленькое действие из simpleDigits
     // Многошаговая подготовка сама доведет до нужного состояния
@@ -1078,7 +1102,7 @@ export class FriendsExampleGenerator {
             states: [...newStates]
           });
           states = newStates;
-          console.log(`🎯 Случайное начало: +${smartStart} (из simpleDigits), состояние: [${newStates.join(', ')}]`);
+          this._log(`🎯 Случайное начало: +${smartStart} (из simpleDigits), состояние: [${newStates.join(', ')}]`);
         }
       }
     }
@@ -1086,12 +1110,12 @@ export class FriendsExampleGenerator {
     // ШАГ 2: ЦИКЛ генерации Friends действий
     // Пытаемся добавить несколько Friends с простыми шагами между ними
     while (friendsAdded < maxFriends && steps.length < targetSteps - 2) {
-      console.log(`\n🔄 Попытка ${friendsAdded + 1} Friends...`);
+      this._log(`\n🔄 Попытка ${friendsAdded + 1} Friends...`);
 
       // Выбираем СЛУЧАЙНУЮ цифру Friends для РАЗНООБРАЗИЯ
       const friendDigit = this.config.selectedDigits[Math.floor(Math.random() * this.config.selectedDigits.length)] || 1;
       const requiredFirstVal = 10 - friendDigit; // Для digit=1 нужно 9, для digit=9 нужно 1
-      console.log(`  Выбрана Friends цифра: ${friendDigit} (нужно состояние единиц >= ${requiredFirstVal})`);
+      this._log(`  Выбрана Friends цифра: ${friendDigit} (нужно состояние единиц >= ${requiredFirstVal})`);
 
       // ШАГ 2.1: Выбираем СЛУЧАЙНОЕ целевое значение единиц из диапазона
       // НО ВАЖНО: вычитание friend должно быть возможно по правилу Просто!
@@ -1110,8 +1134,8 @@ export class FriendsExampleGenerator {
       }
 
       const targetFirstVal = validTargets[Math.floor(Math.random() * validTargets.length)];
-      console.log(`🎲 Целевое состояние единиц: ${targetFirstVal} (валидные: [${validTargets.join(', ')}])`);
-      console.log(`   После Friends останется: ${targetFirstVal - friend} бусин`);
+      this._log(`🎲 Целевое состояние единиц: ${targetFirstVal} (валидные: [${validTargets.join(', ')}])`);
+      this._log(`   После Friends останется: ${targetFirstVal - friend} бусин`);
 
       // ШАГ 2.2: АГРЕССИВНО подготавливаем единицы к целевому состоянию
     let maxIterations = 20;
@@ -1140,7 +1164,7 @@ export class FriendsExampleGenerator {
               });
               states = newStates;
               added = true;
-              console.log(`➕ Подготовка: +${tryAdd}, состояние: [${newStates.join(', ')}]`);
+              this._log(`➕ Подготовка: +${tryAdd}, состояние: [${newStates.join(', ')}]`);
               break;
             }
           }
@@ -1204,7 +1228,7 @@ export class FriendsExampleGenerator {
 
           // Применяем изменения только если весь путь успешен
           if (pathSuccess && tempState === targetFirstVal) {
-            console.log(`🔄 Обходной путь через 9: ${allTempSteps.length} шагов`);
+            this._log(`🔄 Обходной путь через 9: ${allTempSteps.length} шагов`);
             steps.push(...allTempSteps);
             states = tempStates;  // Применяем изменения
             added = true;
@@ -1238,7 +1262,7 @@ export class FriendsExampleGenerator {
               });
               states = newStates;
               removed = true;
-              console.log(`➖ Подготовка: -${trySub}, состояние: [${newStates.join(', ')}]`);
+              this._log(`➖ Подготовка: -${trySub}, состояние: [${newStates.join(', ')}]`);
               break;
             }
           }
@@ -1302,7 +1326,7 @@ export class FriendsExampleGenerator {
 
           // Применяем изменения только если весь путь успешен
           if (pathSuccess && tempState === targetFirstVal) {
-            console.log(`🔄 Обходной путь через 0: ${allTempSteps.length} шагов`);
+            this._log(`🔄 Обходной путь через 0: ${allTempSteps.length} шагов`);
             steps.push(...allTempSteps);
             states = tempStates;  // Применяем изменения
             removed = true;
@@ -1316,7 +1340,7 @@ export class FriendsExampleGenerator {
       }
     }
 
-      console.log(`🔧 Подготовка завершена: единицы = ${states[0]}, целевое = ${targetFirstVal}`);
+      this._log(`🔧 Подготовка завершена: единицы = ${states[0]}, целевое = ${targetFirstVal}`);
 
       // ШАГ 2.3: Применяем Friends действие (ОДНОЗНАЧНОЕ!)
       const currentFirst = states[0] || 0;
@@ -1348,7 +1372,7 @@ export class FriendsExampleGenerator {
           });
           states = newStates;
           friendsAdded++;
-          console.log(`✅ Friends #${friendsAdded} добавлен: +${friendDigit} (формула: +10-${friend}), состояние: [${newStates.join(', ')}]`);
+          this._log(`✅ Friends #${friendsAdded} добавлен: +${friendDigit} (формула: +10-${friend}), состояние: [${newStates.join(', ')}]`);
 
           // ШАГ 2.3: Добавляем 1-2 простых шага после Friends для разнообразия
           const simpleStepsAfter = friendsAdded < maxFriends ? (Math.floor(Math.random() * 2) + 1) : 0; // 1-2 шага, или 0 если это последний Friends
@@ -1367,7 +1391,7 @@ export class FriendsExampleGenerator {
                   states: [...newSimpleStates]
                 });
                 states = newSimpleStates;
-                console.log(`  ➕ Простой шаг: +${randomAction}, состояние: [${newSimpleStates.join(', ')}]`);
+                this._log(`  ➕ Простой шаг: +${randomAction}, состояние: [${newSimpleStates.join(', ')}]`);
                 continue;
               }
             }
@@ -1382,7 +1406,7 @@ export class FriendsExampleGenerator {
                   states: [...newSimpleStates]
                 });
                 states = newSimpleStates;
-                console.log(`  ➖ Простой шаг: -${randomAction}, состояние: [${newSimpleStates.join(', ')}]`);
+                this._log(`  ➖ Простой шаг: -${randomAction}, состояние: [${newSimpleStates.join(', ')}]`);
               }
             }
           }
@@ -1405,7 +1429,7 @@ export class FriendsExampleGenerator {
     if (friendsAdded < minFriends) {
       console.error(`❌ КРИТИЧНО: Fallback не смог сгенерировать минимум ${minFriends} Friends! Сгенерировано: ${friendsAdded}`);
     } else {
-      console.log(`✅ Успешно сгенерировано ${friendsAdded} Friends действий!`);
+      this._log(`✅ Успешно сгенерировано ${friendsAdded} Friends действий!`);
     }
 
     // ШАГ 4: Заполняем оставшиеся шаги РАЗНООБРАЗНЫМИ простыми действиями
@@ -1572,7 +1596,7 @@ export class FriendsExampleGenerator {
       }
     }
 
-    console.log(`📊 Fallback результат: ${finalSteps.length} шагов, ${friendsAdded} Friends`);
+    this._log(`📊 Fallback результат: ${finalSteps.length} шагов, ${friendsAdded} Friends`);
 
     return {
       start: Array(this.config.digitCount).fill(0),
