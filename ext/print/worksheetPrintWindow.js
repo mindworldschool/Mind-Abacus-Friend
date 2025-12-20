@@ -43,8 +43,17 @@ export function openWorksheetPrintWindow(options = {}) {
 
   const { examples, showAnswers, settings } = worksheet;
 
-  // Получаем количество действий из настроек
-  const actionsCount = getActionsCount(settings);
+  // Получаем количество действий из настроек (для совместимости)
+  const settingsActionsCount = getActionsCount(settings);
+
+  // Вычисляем РЕАЛЬНОЕ максимальное количество шагов из всех примеров
+  const actualMaxSteps = Math.max(
+    ...examples.map(ex => ex.steps ? ex.steps.length : 0),
+    settingsActionsCount  // Используем настройки как минимум
+  );
+
+  // Используем реальное количество шагов для генерации таблиц
+  const actionsCount = actualMaxSteps;
 
   const language = getCurrentLanguage();
   const mode = state.settings.mode || "abacus";
@@ -348,6 +357,12 @@ export function openWorksheetPrintWindow(options = {}) {
 
     // Генерируем таблицы для этой группы
     tablesInGroup.forEach((pageExamples) => {
+      // Вычисляем РЕАЛЬНОЕ максимальное количество шагов из примеров на этой странице
+      const maxStepsOnPage = Math.max(
+        ...pageExamples.filter(ex => ex).map(ex => ex.steps ? ex.steps.length : 0),
+        actionsCount  // Используем actionsCount как минимум
+      );
+
       doc.write(`
         <table class="examples-table">
           <thead>
@@ -371,8 +386,8 @@ export function openWorksheetPrintWindow(options = {}) {
           <tbody>
       `);
 
-      // Строки с числами (по количеству действий)
-      for (let row = 0; row < actionsCount; row++) {
+      // Строки с числами (используем РЕАЛЬНОЕ количество шагов)
+      for (let row = 0; row < maxStepsOnPage; row++) {
         doc.write(`<tr>`);
 
         // Номер строки в левой колонке
