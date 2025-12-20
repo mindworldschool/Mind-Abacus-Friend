@@ -90,8 +90,14 @@ export function generateWorksheet(printConfig = {}) {
 
   const examples = [];
 
+  // Добавляем флаг silent для печати (отключает избыточное логирование)
+  const settingsForPrint = {
+    ...settings,
+    silent: true
+  };
+
   for (let i = 0; i < examplesCount; i += 1) {
-    const rawExample = generateExample(settings);
+    const rawExample = generateExample(settingsForPrint);
 
     // Подстрахуемся: генерируем только простые объекты без лишних ссылок
     examples.push({
