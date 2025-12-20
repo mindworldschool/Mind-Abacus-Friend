@@ -95,7 +95,7 @@ export class FriendsExampleGenerator {
       this.digitUsageCount[digit] = 0;
     }
 
-    console.log(`🤝 FriendsExampleGenerator создан:
+    this._log(`🤝 FriendsExampleGenerator создан:
   Выбранные цифры Друзья: [${this.config.selectedDigits.join(', ')}]
   Простые цифры: [${this.config.simpleDigits.join(', ')}]
   Разрядность: ${this.config.digitCount}
@@ -118,9 +118,11 @@ export class FriendsExampleGenerator {
     }
   }
 
-  // Утилита для предупреждений (всегда выводятся)
+  // Утилита для предупреждений (подавляются в тихом режиме)
   _warn(...args) {
-    console.warn(...args);
+    if (!this.config.silent) {
+      console.warn(...args);
+    }
   }
 
   // Утилита для ошибок (всегда выводятся)
@@ -501,19 +503,19 @@ export class FriendsExampleGenerator {
 
       if (!example) {
         if (attempt % 30 === 0) {
-          console.warn(`⚠️ Попытка ${attempt}: не удалось сгенерировать пример`);
+          this._warn(`⚠️ Попытка ${attempt}: не удалось сгенерировать пример`);
         }
         continue;
       }
 
       if (!this._validateExample(example)) {
         if (attempt % 30 === 0) {
-          console.warn(`⚠️ Попытка ${attempt}: пример не прошёл валидацию`);
+          this._warn(`⚠️ Попытка ${attempt}: пример не прошёл валидацию`);
         }
         continue;
       }
 
-      console.log(`✅ Пример сгенерирован за ${attempt} попыток: ${this._formatForDisplay(example)}`);
+      this._log(`✅ Пример сгенерирован за ${attempt} попыток: ${this._formatForDisplay(example)}`);
       return example;
     }
 
@@ -541,7 +543,7 @@ export class FriendsExampleGenerator {
     let lastSimpleDigit = null;
     let stepsSinceLastFriend = 0;
 
-    console.log(`🎯 Генерация Friends примера: ${targetSteps} шагов (точно)`);
+    this._log(`🎯 Генерация Friends примера: ${targetSteps} шагов (точно)`);
 
     while (steps.length < targetSteps && attempts < maxAttempts) {
       attempts++;
@@ -1172,7 +1174,7 @@ export class FriendsExampleGenerator {
 
         if (!added) {
           // Прямой путь невозможен - пробуем МНОГОШАГОВЫЙ ОБХОДНОЙ путь через 9
-          console.warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${targetFirstVal}. Пробуем через 9...`);
+          this._warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${targetFirstVal}. Пробуем через 9...`);
 
           // Путь: current → 9 → target (многошаговый)
           let tempState = currentFirst;
@@ -1270,7 +1272,7 @@ export class FriendsExampleGenerator {
 
         if (!removed) {
           // Прямой путь невозможен - пробуем МНОГОШАГОВЫЙ ОБХОДНОЙ путь через 0
-          console.warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${targetFirstVal}. Пробуем через 0...`);
+          this._warn(`⚠️ Прямой путь невозможен: ${currentFirst}→${targetFirstVal}. Пробуем через 0...`);
 
           // Путь: current → 0 → target (многошаговый)
           let tempState = currentFirst;

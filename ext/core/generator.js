@@ -36,10 +36,10 @@ import { MultiDigitGenerator } from "./MultiDigitGenerator.js";
  */
 export function generateExample(settings = {}) {
   try {
-    console.log("🧠 [generator] входные настройки:", settings);
-    console.log("🔍 [generator] settings.blocks:", settings.blocks);
-    console.log("🔍 [generator] settings.blocks?.simple?.digits:", settings.blocks?.simple?.digits);
-    console.log("🔍 [generator] settings.actions:", settings.actions);
+if (!settings.silent)     console.log("🧠 [generator] входные настройки:", settings);
+if (!settings.silent)     console.log("🔍 [generator] settings.blocks:", settings.blocks);
+if (!settings.silent)     console.log("🔍 [generator] settings.blocks?.simple?.digits:", settings.blocks?.simple?.digits);
+if (!settings.silent)     console.log("🔍 [generator] settings.actions:", settings.actions);
 
     //
     // 1. Разрядность
@@ -67,7 +67,7 @@ export function generateExample(settings = {}) {
     //   - infinite: "игра бесконечно", тогда мы просто берём разумный коридор
     //
     const actionsCfg = settings.actions || {};
-    console.log("🔍 [generator] actionsCfg:", actionsCfg);
+if (!settings.silent)     console.log("🔍 [generator] actionsCfg:", actionsCfg);
 
     const minStepsRaw = actionsCfg.infinite
       ? 2
@@ -79,7 +79,7 @@ export function generateExample(settings = {}) {
     let minSteps = minStepsRaw;
     let maxSteps = maxStepsRaw;
 
-    console.log("🔍 [generator] minSteps:", minSteps, "maxSteps:", maxSteps);
+if (!settings.silent)     console.log("🔍 [generator] minSteps:", minSteps, "maxSteps:", maxSteps);
 
     //
     // 3. Какие цифры разрешены ребёнку в блоке "Просто"
@@ -107,8 +107,8 @@ export function generateExample(settings = {}) {
       (a, b) => a - b
     );
 
-    console.log("🔍 [generator] originalDigits:", originalDigits);
-    console.log("🔍 [generator] selectedDigits (для блока Просто):", selectedDigits);
+if (!settings.silent)     console.log("🔍 [generator] originalDigits:", originalDigits);
+if (!settings.silent)     console.log("🔍 [generator] selectedDigits (для блока Просто):", selectedDigits);
 
     //
     // 4. includeFive — методический флаг.
@@ -170,7 +170,7 @@ export function generateExample(settings = {}) {
     const friendsActive = friendsDigits.length > 0;
     const mixActive = mixDigits.length > 0;
 
-    console.log(`🔍 [generator] Проверка активации блоков:`, {
+if (!settings.silent)     console.log(`🔍 [generator] Проверка активации блоков:`, {
       brothersDigits,
       brothersActive,
       friendsDigits,
@@ -218,7 +218,7 @@ export function generateExample(settings = {}) {
       blocks: blocks
     };
 
-    console.log(
+if (!settings.silent)     console.log(
       "🧩 [generator] ruleConfig:",
       JSON.stringify(
         {
@@ -261,10 +261,10 @@ export function generateExample(settings = {}) {
 
     if (friendsActive === true) {
       // 🆕 ДРУЗЬЯ — используем специализированный генератор
-      console.log("🤝 [generator] Специализированный генератор: ДРУЗЬЯ");
-      console.log("   📌 Выбранные друзья:", friendsDigits);
-      console.log("   📌 Только сложение:", blocks?.friends?.onlyAddition);
-      console.log("   📌 Только вычитание:", blocks?.friends?.onlySubtraction);
+if (!settings.silent)       console.log("🤝 [generator] Специализированный генератор: ДРУЗЬЯ");
+if (!settings.silent)       console.log("   📌 Выбранные друзья:", friendsDigits);
+if (!settings.silent)       console.log("   📌 Только сложение:", blocks?.friends?.onlyAddition);
+if (!settings.silent)       console.log("   📌 Только вычитание:", blocks?.friends?.onlySubtraction);
 
       // Преобразуем строковые цифры в числа
       const selectedFriendsDigits = friendsDigits
@@ -290,7 +290,7 @@ export function generateExample(settings = {}) {
       const rawExample = friendsGenerator.generate();
       const formatted = friendsGenerator.toTrainerFormat(rawExample);
 
-      console.log(
+if (!settings.silent)       console.log(
         "✅ [generator] Friends пример готов:",
         JSON.stringify(formatted, null, 2)
       );
@@ -299,10 +299,10 @@ export function generateExample(settings = {}) {
 
     } else if (brothersActive === true) {
       // БРАТЬЯ — переходы через 5
-      console.log("👬 [generator] Базовое правило: БРАТЬЯ");
-      console.log("   📌 Выбранные братья:", brothersDigits);
-      console.log("   📌 Только сложение:", blocks?.brothers?.onlyAddition);
-      console.log("   📌 Только вычитание:", blocks?.brothers?.onlySubtraction);
+if (!settings.silent)       console.log("👬 [generator] Базовое правило: БРАТЬЯ");
+if (!settings.silent)       console.log("   📌 Выбранные братья:", brothersDigits);
+if (!settings.silent)       console.log("   📌 Только сложение:", blocks?.brothers?.onlyAddition);
+if (!settings.silent)       console.log("   📌 Только вычитание:", blocks?.brothers?.onlySubtraction);
 
       RuleClass = BrothersRule;
 
@@ -324,7 +324,7 @@ export function generateExample(settings = {}) {
 
     } else {
       // ПРОСТО — без формул
-      console.log("📘 [generator] Базовое правило: ПРОСТО");
+if (!settings.silent)       console.log("📘 [generator] Базовое правило: ПРОСТО");
       RuleClass = UnifiedSimpleRule;
       ruleConfigForClass = {
         ...ruleConfig,
@@ -350,12 +350,12 @@ export function generateExample(settings = {}) {
 
     if (effectiveDigitCount > 1 || friendsActive) {
       if (friendsActive && digitCount === 1) {
-        console.log(`🔢 [generator] Режим ОДНОРАЗРЯДНЫЕ ДЕЙСТВИЯ для Друзья`);
-        console.log(`   📌 Действия: однозначные (+1, +2, +3)`);
-        console.log(`   📌 Состояние абакуса: 2 разряда (для формулы +10-friend)`);
+if (!settings.silent)         console.log(`🔢 [generator] Режим ОДНОРАЗРЯДНЫЕ ДЕЙСТВИЯ для Друзья`);
+if (!settings.silent)         console.log(`   📌 Действия: однозначные (+1, +2, +3)`);
+if (!settings.silent)         console.log(`   📌 Состояние абакуса: 2 разряда (для формулы +10-friend)`);
       } else {
-        console.log(`🔢 [generator] Режим МНОГОРАЗРЯДНЫЙ (${effectiveDigitCount} разрядов)`);
-        console.log(`   📌 Переменная разрядность: ${combineLevels}`);
+if (!settings.silent)         console.log(`🔢 [generator] Режим МНОГОРАЗРЯДНЫЙ (${effectiveDigitCount} разрядов)`);
+if (!settings.silent)         console.log(`   📌 Переменная разрядность: ${combineLevels}`);
       }
 
       // Многоразрядный режим - используем MultiDigitGenerator
@@ -367,7 +367,7 @@ export function generateExample(settings = {}) {
         originalDigitCount: digitCount // Сохраняем оригинальную разрядность для контроля действий
       });
     } else {
-      console.log("🔤 [generator] Режим ОДНОРАЗРЯДНЫЙ");
+if (!settings.silent)       console.log("🔤 [generator] Режим ОДНОРАЗРЯДНЫЙ");
 
       // Одноразрядный режим - используем правило напрямую
       rule = new RuleClass(ruleConfigForClass);
@@ -389,7 +389,7 @@ export function generateExample(settings = {}) {
     //
     const formatted = gen.toTrainerFormat(rawExample);
 
-    console.log(
+if (!settings.silent)     console.log(
       "✅ [generator] пример готов:",
       JSON.stringify(formatted, null, 2)
     );
