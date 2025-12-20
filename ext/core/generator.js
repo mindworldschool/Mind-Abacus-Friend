@@ -166,8 +166,8 @@ if (!settings.silent)     console.log("🔍 [generator] selectedDigits (для �
       ? blocks.mix.digits.filter(d => d != null && d !== "")
       : [];
 
-    const brothersActive = brothersDigits.length > 0;
-    const friendsActive = friendsDigits.length > 0;
+    const brothersActive = brothersDigits.length > 0 && digitCount >= 2;
+    const friendsActive = friendsDigits.length > 0 && digitCount >= 2;
     const mixActive = mixDigits.length > 0;
 
 if (!settings.silent)     console.log(`🔍 [generator] Проверка активации блоков:`, {
