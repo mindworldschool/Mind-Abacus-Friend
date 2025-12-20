@@ -72,6 +72,14 @@ export class FriendsExampleGenerator {
       this.config.digitCount = 2;
     }
 
+    // МИНИМУМ для правила Друзья: 4 шага
+    // Причина: нужно минимум 1-2 шага подготовки + 1 Friends + 1 заполнение
+    const MIN_STEPS_FOR_FRIENDS = 4;
+    if (this.config.stepsCount < MIN_STEPS_FOR_FRIENDS) {
+      console.warn(`⚠️ FriendsExampleGenerator: правило Друзья требует минимум ${MIN_STEPS_FOR_FRIENDS} шага! Было: ${this.config.stepsCount}, устанавливаем ${MIN_STEPS_FOR_FRIENDS}`);
+      this.config.stepsCount = MIN_STEPS_FOR_FRIENDS;
+    }
+
     // ЦЕЛЕВОЙ РАЗРЯД = самый старший (digitCount - 1)
     this.targetPosition = this.config.digitCount - 1;
 
@@ -1314,9 +1322,11 @@ export class FriendsExampleGenerator {
       const currentFirst = states[0] || 0;
       // friend уже объявлен выше в строке 1076
 
-      // КРИТИЧЕСКАЯ ПРОВЕРКА: можно ли вычесть friend по правилу Просто?
+      // КРИТИЧЕСКАЯ ПРОВЕРКА:
+      // 1. Достигли ли целевого состояния (targetFirstVal)?
+      // 2. Можно ли вычесть friend по правилу Просто?
       // Например, из 6 (U=1,L=1) вычесть -2 НЕЛЬЗЯ по Просто (это МИКС!)
-      if (currentFirst >= requiredFirstVal && this._canMinusDirect(currentFirst, friend) && steps.length < targetSteps) {
+      if (currentFirst === targetFirstVal && this._canMinusDirect(currentFirst, friend) && steps.length < targetSteps) {
         // Применяем Friends ВРУЧНУЮ к единицам: +friendDigit = +10 - friend
         const newStates = [...states];
 
@@ -1379,7 +1389,9 @@ export class FriendsExampleGenerator {
         }
       } else {
         // Проверяем причину отказа
-        if (currentFirst < requiredFirstVal) {
+        if (currentFirst !== targetFirstVal) {
+          console.warn(`⚠️ Не удалось достичь целевого состояния! Текущее=${currentFirst}, целевое=${targetFirstVal}`);
+        } else if (currentFirst < requiredFirstVal) {
           console.warn(`⚠️ Недостаточно бусин! Текущее=${currentFirst}, требуется минимум ${requiredFirstVal}`);
         } else if (!this._canMinusDirect(currentFirst, friend)) {
           console.warn(`⚠️ Невозможно вычесть friend=${friend} из ${currentFirst} по правилу Просто (будет МИКС)!`);
