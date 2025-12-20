@@ -1314,9 +1314,11 @@ export class FriendsExampleGenerator {
       const currentFirst = states[0] || 0;
       // friend уже объявлен выше в строке 1076
 
-      // КРИТИЧЕСКАЯ ПРОВЕРКА: можно ли вычесть friend по правилу Просто?
+      // КРИТИЧЕСКАЯ ПРОВЕРКА:
+      // 1. Достигли ли целевого состояния (targetFirstVal)?
+      // 2. Можно ли вычесть friend по правилу Просто?
       // Например, из 6 (U=1,L=1) вычесть -2 НЕЛЬЗЯ по Просто (это МИКС!)
-      if (currentFirst >= requiredFirstVal && this._canMinusDirect(currentFirst, friend) && steps.length < targetSteps) {
+      if (currentFirst === targetFirstVal && this._canMinusDirect(currentFirst, friend) && steps.length < targetSteps) {
         // Применяем Friends ВРУЧНУЮ к единицам: +friendDigit = +10 - friend
         const newStates = [...states];
 
@@ -1379,7 +1381,9 @@ export class FriendsExampleGenerator {
         }
       } else {
         // Проверяем причину отказа
-        if (currentFirst < requiredFirstVal) {
+        if (currentFirst !== targetFirstVal) {
+          console.warn(`⚠️ Не удалось достичь целевого состояния! Текущее=${currentFirst}, целевое=${targetFirstVal}`);
+        } else if (currentFirst < requiredFirstVal) {
           console.warn(`⚠️ Недостаточно бусин! Текущее=${currentFirst}, требуется минимум ${requiredFirstVal}`);
         } else if (!this._canMinusDirect(currentFirst, friend)) {
           console.warn(`⚠️ Невозможно вычесть friend=${friend} из ${currentFirst} по правилу Просто (будет МИКС)!`);
