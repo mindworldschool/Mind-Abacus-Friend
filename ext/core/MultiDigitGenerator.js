@@ -29,13 +29,11 @@ export class MultiDigitGenerator {
     this.isSimpleRule = RuleClass.name === 'UnifiedSimpleRule' ||
                         this.baseRule.name === 'Просто' ||
                         !this.isBrothersRule;
-    
+
     // Количество разрядов
     this.displayDigitCount = Math.max(1, Math.min(9, maxDigitCount));
     this.maxDigitCount = this.displayDigitCount + 1; // +1 для переноса
-    
-    console.log(`📊 Разрядность: пример=${this.displayDigitCount}, абакус=${this.maxDigitCount}`);
-    
+
     this.config = {
       ...config,
       maxDigitCount: this.maxDigitCount,
@@ -48,18 +46,37 @@ export class MultiDigitGenerator {
       _zeroDigitsUsed: 0,
       _roundNumbersUsed: 0
     };
-    
+
+    this._log(`📊 Разрядность: пример=${this.displayDigitCount}, абакус=${this.maxDigitCount}`);
+
     const ruleType = this.isBrothersRule ? 'Brothers' : 'Simple';
     this.name = `${this.baseRule.name} (Multi-Digit ${this.displayDigitCount}, ${ruleType})`;
 
     const selectedDigits = this.baseRule.config?.selectedDigits || [];
 
-    console.log(`🔢 MultiDigitGenerator создан:
+    this._log(`🔢 MultiDigitGenerator создан:
   Базовое правило: ${this.baseRule.name}
   Тип: ${ruleType}
   Разрядность примера: ${this.displayDigitCount}
   Выбранные цифры: [${selectedDigits.join(', ')}]
   isBrothers: ${this.isBrothersRule}, isSimple: ${this.isSimpleRule}`);
+  }
+
+  // Утилиты для логирования с учетом флага silent
+  _log(...args) {
+    if (!this.config.silent) {
+      console.log(...args);
+    }
+  }
+
+  _warn(...args) {
+    if (!this.config.silent) {
+      console.warn(...args);
+    }
+  }
+
+  _error(...args) {
+    console.error(...args);
   }
 
   generateStartState() {
@@ -96,8 +113,8 @@ export class MultiDigitGenerator {
     const states = this.generateStartState();
     const stepsCount = this.generateStepsCount();
     const steps = [];
-    
-    console.log(`🎯 Генерация стандартного примера: ${stepsCount} шагов`);
+
+    this._log(`🎯 Генерация стандартного примера: ${stepsCount} шагов`);
     
     this.config._duplicatesUsed = 0;
     this.config._zeroDigitsUsed = 0;
@@ -132,7 +149,7 @@ export class MultiDigitGenerator {
       // 🔴 КРИТИЧНО: Проверка переполнения разрядности!
       // Для Братьев тоже возможен перенос в следующий разряд
       if (this._checkOverflow(newStates)) {
-        console.log(`  ⚠️ Переполнение разрядности! Пропускаем шаг.`);
+        this._log(`  ⚠️ Переполнение разрядности! Пропускаем шаг.`);
         continue;
       }
       
@@ -145,8 +162,8 @@ export class MultiDigitGenerator {
       for (let pos = 0; pos < this.displayDigitCount; pos++) {
         states[pos] = newStates[pos];
       }
-      
-      console.log(`  ✅ Шаг ${steps.length}: ${result.sign > 0 ? '+' : ''}${result.value}`);
+
+      this._log(`  ✅ Шаг ${steps.length}: ${result.sign > 0 ? '+' : ''}${result.value}`);
     }
     
     return {
@@ -443,44 +460,44 @@ export class MultiDigitGenerator {
 
   validateExample(example) {
     const { start, steps, answer } = example;
-    
+
     if (!Array.isArray(start) || start.some(s => s !== 0)) {
-      console.error('❌ MultiDigit: стартовое состояние должно быть [0,0,...]');
+      this._error('❌ MultiDigit: стартовое состояние должно быть [0,0,...]');
       return false;
     }
-    
+
     let currentStates = [...start];
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-      
+
       if (i === 0 && step.action < 0) {
-        console.error('❌ MultiDigit: первый шаг должен быть положительным');
+        this._error('❌ MultiDigit: первый шаг должен быть положительным');
         return false;
       }
-      
+
       currentStates = this.applyAction(currentStates, step);
-      
+
       if (!this.isValidState(currentStates)) {
-        console.error(`❌ MultiDigit: шаг ${i + 1} невалиден`);
+        this._error(`❌ MultiDigit: шаг ${i + 1} невалиден`);
         return false;
       }
-      
+
       // Проверка переполнения разрядности
       if (this._checkOverflow(currentStates)) {
-        console.error(`❌ MultiDigit: шаг ${i + 1} - переполнение разрядности!`);
+        this._error(`❌ MultiDigit: шаг ${i + 1} - переполнение разрядности!`);
         return false;
       }
     }
     
     const finalNumber = this.stateToNumber(currentStates);
     const answerNumber = this.stateToNumber(answer);
-    
+
     if (finalNumber !== answerNumber) {
-      console.error(`❌ MultiDigit: финал ${finalNumber} ≠ ответ ${answerNumber}`);
+      this._error(`❌ MultiDigit: финал ${finalNumber} ≠ ответ ${answerNumber}`);
       return false;
     }
 
-    console.log(`✅ MultiDigit: пример валиден`);
+    this._log(`✅ MultiDigit: пример валиден`);
     return true;
   }
 }

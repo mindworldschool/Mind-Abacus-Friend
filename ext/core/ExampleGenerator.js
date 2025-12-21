@@ -9,7 +9,24 @@
 export class ExampleGenerator {
   constructor(rule) {
     this.rule = rule;
-    console.log(`⚙️ Генератор создан с правилом: ${rule.name}`);
+    this._log(`⚙️ Генератор создан с правилом: ${rule.name}`);
+  }
+
+  // Утилиты для логирования с учетом флага silent
+  _log(...args) {
+    if (!this.rule.config?.silent) {
+      console.log(...args);
+    }
+  }
+
+  _warn(...args) {
+    if (!this.rule.config?.silent) {
+      console.warn(...args);
+    }
+  }
+
+  _error(...args) {
+    console.error(...args);
   }
 
   /**
@@ -24,10 +41,10 @@ export class ExampleGenerator {
     
     // Если правило - это MultiDigitGenerator, он сам генерирует пример
     if (isMultiDigit) {
-      console.log('🔢 ExampleGenerator: используем MultiDigitGenerator');
+      this._log('🔢 ExampleGenerator: используем MultiDigitGenerator');
       return this.rule.generateExample();
     }
-    
+
     // Иначе используем старую логику
     const digitCount = this.rule.config?.digitCount || 1;
     const combineLevels = this.rule.config?.combineLevels || false;
@@ -39,7 +56,7 @@ export class ExampleGenerator {
       maxAttempts *= 2;
     }
 
-    console.log(
+    this._log(
       `🎯 Генерация примера: digitCount=${digitCount}, combineLevels=${combineLevels}, попыток=${maxAttempts}`
     );
 
@@ -75,7 +92,7 @@ export class ExampleGenerator {
 
         if (example.steps.length < minStepsRequired) {
           if (attempt % 30 === 0) {
-            console.warn(
+            this._warn(
               `⚠️ Попытка ${attempt}: слишком короткая цепочка (${example.steps.length} < ${minStepsRequired})`
             );
           }
@@ -85,7 +102,7 @@ export class ExampleGenerator {
         // Проверка промежуточных состояний
         if (!this._validateIntermediateStates(example)) {
           if (attempt % 30 === 0) {
-            console.warn(`⚠️ Попытка ${attempt}: невалидное промежуточное состояние`);
+            this._warn(`⚠️ Попытка ${attempt}: невалидное промежуточное состояние`);
           }
           continue;
         }
@@ -93,24 +110,24 @@ export class ExampleGenerator {
         // Проверяем валидацию правила (например, для BrothersRule - наличие братских шагов)
         if (!this.validate(example)) {
           if (attempt % 30 === 0) {
-            console.warn(`⚠️ Попытка ${attempt}: пример не прошёл валидацию правила`);
+            this._warn(`⚠️ Попытка ${attempt}: пример не прошёл валидацию правила`);
           }
           continue;
         }
 
-        console.log(
+        this._log(
           `✅ Пример сгенерирован за ${attempt} попыток: ${this.formatForDisplay(example)}`
         );
         return example;
       } catch (e) {
         if (attempt % 30 === 0) {
-          console.warn(`⚠️ Попытка ${attempt} упала с ошибкой:`, e.message);
+          this._warn(`⚠️ Попытка ${attempt} упала с ошибкой:`, e.message);
         }
       }
     }
 
     // Если не смогли сгенерировать — даём минимальный fallback
-    console.error(
+    this._error(
       `❌ Не удалось сгенерировать пример за ${maxAttempts} попыток. Возвращаем fallback.`
     );
     return this._fallbackExample();
@@ -312,7 +329,7 @@ export class ExampleGenerator {
       const stateArr = example.steps[i].toState;
       if (Array.isArray(stateArr)) {
         if (stateArr.some(d => d < 0 || d > 9)) {
-          console.warn(
+          this._warn(
             `❌ Шаг ${i + 1}: состояние [${stateArr.join(
               ", "
             )}] содержит недопустимое значение`
@@ -325,7 +342,7 @@ export class ExampleGenerator {
     const finalArr = example.answer;
     if (Array.isArray(finalArr)) {
       if (finalArr.some(d => d < 0 || d > 9)) {
-        console.warn(
+        this._warn(
           `❌ Финал содержит недопустимую цифру [${finalArr.join(
             ", "
           )}]`
@@ -374,7 +391,7 @@ export class ExampleGenerator {
     
     // === МНОГОЗНАЧНЫЙ РЕЖИМ (MultiDigitGenerator) ===
     if (isMultiDigit) {
-      console.log('🔢 toTrainerFormat: обработка MultiDigitGenerator');
+      this._log('🔢 toTrainerFormat: обработка MultiDigitGenerator');
       
       const formattedSteps = [];
       
@@ -458,7 +475,7 @@ export class ExampleGenerator {
             formula: action.formula          // [{op:"+",val:5},{op:"-",val:4}]
           });
 
-          console.log(`👬 Братский шаг: ${signStr}${val} (брат ${action.brotherN})`);
+          this._log(`👬 Братский шаг: ${signStr}${val} (брат ${action.brotherN})`);
           continue;
         }
 
@@ -474,7 +491,7 @@ export class ExampleGenerator {
             formula: action.formula          // [{op:"+",val:10},{op:"-",val:1}]
           });
 
-          console.log(`🤝 Дружеский шаг: ${signStr}${val} (друг ${action.friendN})`);
+          this._log(`🤝 Дружеский шаг: ${signStr}${val} (друг ${action.friendN})`);
           continue;
         }
 

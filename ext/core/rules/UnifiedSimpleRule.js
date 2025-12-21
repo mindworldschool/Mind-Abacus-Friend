@@ -118,7 +118,7 @@ export class UnifiedSimpleRule extends BaseRule {
       // 🔥 УБРАЛИ: ...config в конце - теперь наследование в начале
     };
 
-    console.log(
+    this._log(
       `✅ UnifiedSimpleRule инициализировано:
   digitsAllowed=[${selectedDigits.join(", ")}]
   includeFive=${includeFive}
@@ -129,6 +129,23 @@ export class UnifiedSimpleRule extends BaseRule {
   onlySubtraction=${this.config.onlySubtraction}
   firstActionMustBePositive=${this.config.firstActionMustBePositive}`
     );
+  }
+
+  // Утилиты для логирования с учетом флага silent
+  _log(...args) {
+    if (!this.config.silent) {
+      console.log(...args);
+    }
+  }
+
+  _warn(...args) {
+    if (!this.config.silent) {
+      console.warn(...args);
+    }
+  }
+
+  _error(...args) {
+    console.error(...args);
   }
 
   /**
@@ -305,7 +322,7 @@ export class UnifiedSimpleRule extends BaseRule {
     const stateStr = Array.isArray(currentState)
       ? `[${currentState.join(", ")}]`
       : currentState;
-    console.log(
+    this._log(
       `⚙️ getAvailableActions(): state=${stateStr}, pos=${position}, v=${v} → [${out
         .map(a => (typeof a === "object" ? a.value : a))
         .join(", ")}]`
@@ -396,7 +413,7 @@ export class UnifiedSimpleRule extends BaseRule {
     // 1. старт должен быть 0
     const startNum = this.stateToNumber(start);
     if (startNum !== 0) {
-      console.error(`❌ Стартовое состояние ${startNum} ≠ 0`);
+      this._error(`❌ Стартовое состояние ${startNum} ≠ 0`);
       return false;
     }
 
@@ -408,7 +425,7 @@ export class UnifiedSimpleRule extends BaseRule {
           ? firstActionRaw.value
           : firstActionRaw;
       if (firstVal <= 0) {
-        console.error(
+        this._error(
           `❌ Первое действие ${firstVal} не положительное`
         );
         return false;
@@ -421,7 +438,7 @@ export class UnifiedSimpleRule extends BaseRule {
         const stateStr = Array.isArray(step.toState)
           ? `[${step.toState.join(", ")}]`
           : step.toState;
-        console.error(
+        this._error(
           `❌ Недопустимое состояние ${stateStr} (вне ${minState}..${maxState})`
         );
         return false;
@@ -437,7 +454,7 @@ export class UnifiedSimpleRule extends BaseRule {
     const answerNum = this.stateToNumber(answer);
 
     if (calcNum !== answerNum) {
-      console.error(
+      this._error(
         `❌ Пересчёт дал ${calcNum}, а answer=${answerNum}`
       );
       return false;
@@ -447,7 +464,7 @@ export class UnifiedSimpleRule extends BaseRule {
     if (digitCount === 1) {
       const allowedFinals = new Set([0, ...selectedDigits]);
       if (!allowedFinals.has(answerNum)) {
-        console.error(
+        this._error(
           `❌ Финальный ответ ${answerNum} не входит в {0, ${selectedDigits.join(
             ", "
           )}}`
@@ -457,7 +474,7 @@ export class UnifiedSimpleRule extends BaseRule {
     } else {
       // будущий многозначный режим: просто проверяем диапазон
       if (!this.isValidState(answer)) {
-        console.error(
+        this._error(
           `❌ Финальное состояние ${JSON.stringify(
             answer
           )} выходит за пределы ${minState}..${maxState}`
@@ -466,7 +483,7 @@ export class UnifiedSimpleRule extends BaseRule {
       }
     }
 
-    console.log(
+    this._log(
       `✅ Пример валиден (${this.name}): финал=${answerNum}`
     );
     return true;

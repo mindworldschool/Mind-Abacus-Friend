@@ -33,10 +33,11 @@ export class BrothersRule extends BaseRule {
       digitCount: config.digitCount ?? 1,
       combineLevels: config.combineLevels ?? false,
       brotherPriority: 0.5,  // 50% приоритет братским шагам
-      blocks: config.blocks ?? {}
+      blocks: config.blocks ?? {},
+      silent: config.silent || false  // Флаг тихого режима
     };
 
-    console.log(
+    this._log(
       `👬 BrothersRule: братья=[${brothersDigits.join(", ")}], ` +
       `простые=[${simpleBlockDigits.join(", ")}], ` +
       `onlyAdd=${this.config.onlyAddition}, onlySub=${this.config.onlySubtraction}`
@@ -44,6 +45,23 @@ export class BrothersRule extends BaseRule {
 
     // Таблица "братских" пар для быстрой проверки
     this.brotherPairs = this._buildBrotherPairs(brothersDigits);
+  }
+
+  // Утилиты для логирования с учетом флага silent
+  _log(...args) {
+    if (!this.config.silent) {
+      console.log(...args);
+    }
+  }
+
+  _warn(...args) {
+    if (!this.config.silent) {
+      console.warn(...args);
+    }
+  }
+
+  _error(...args) {
+    console.error(...args);
   }
 
   /**
@@ -90,7 +108,7 @@ export class BrothersRule extends BaseRule {
       }
     }
     
-    console.log(`📊 Создано ${pairs.size} братских переходов`);
+    this._log(`📊 Создано ${pairs.size} братских переходов`);
     return pairs;
   }
 
@@ -179,25 +197,25 @@ export class BrothersRule extends BaseRule {
       
       // Не повторяем ТОЧНО то же действие подряд
       if (lastValue === num) {
-        console.log(`🚫 Фильтр повторов: пропускаем ${num} (было в последнем шаге)`);
+        this._log(`🚫 Фильтр повторов: пропускаем ${num} (было в последнем шаге)`);
         return false;
       }
-      
+
       // Не делаем +N сразу после -N (и наоборот)
       if (lastValue === -num) {
-        console.log(`🚫 Фильтр повторов: пропускаем ${num} (противоположное ${lastValue} было в последнем шаге)`);
+        this._log(`🚫 Фильтр повторов: пропускаем ${num} (противоположное ${lastValue} было в последнем шаге)`);
         return false;
       }
-      
+
       // Не повторяем одно абсолютное число 3 раза подряд
       // Например: +4, -4, +4 ← третий раз 4 нельзя
       if (prevValue !== null) {
         const absLast = Math.abs(lastValue);
         const absPrev = Math.abs(prevValue);
         const absNum = Math.abs(num);
-        
+
         if (absLast === absNum && absPrev === absNum) {
-          console.log(`🚫 Фильтр повторов: пропускаем ${num} (абс. значение ${absNum} уже было 2 раза подряд)`);
+          this._log(`🚫 Фильтр повторов: пропускаем ${num} (абс. значение ${absNum} уже было 2 раза подряд)`);
           return false;
         }
       }
@@ -304,12 +322,12 @@ export class BrothersRule extends BaseRule {
 
     // 🔥 ПРИОРИТИЗАЦИЯ: динамический процент
     if (brotherActions.length > 0 && Math.random() < this.config.brotherPriority) {
-      console.log(`👬 Приоритет братским шагам из ${v} (доступно ${brotherActions.length})`);
+      this._log(`👬 Приоритет братским шагам из ${v} (доступно ${brotherActions.length})`);
       return brotherActions;
     }
 
     const allActions = [...brotherActions, ...simpleActions];
-    console.log(`🎲 Состояние ${v}: братских=${brotherActions.length}, простых=${simpleActions.length}, всего=${allActions.length}`);
+    this._log(`🎲 Состояние ${v}: братских=${brotherActions.length}, простых=${simpleActions.length}, всего=${allActions.length}`);
     return allActions;
   }
 
@@ -366,7 +384,7 @@ export class BrothersRule extends BaseRule {
     const { minState, maxState } = this.config;
 
     if (!steps || steps.length < 1) {
-      console.warn("❌ validateExample: нет шагов");
+      this._warn("❌ validateExample: нет шагов");
       return false;
     }
 
@@ -377,23 +395,23 @@ export class BrothersRule extends BaseRule {
       const act = step.action ?? step;
       s = this.applyAction(s, act);
       if (s < minState || s > maxState) {
-        console.warn(`❌ validateExample: выход за диапазон [${minState}, ${maxState}]: ${s}`);
+        this._warn(`❌ validateExample: выход за диапазон [${minState}, ${maxState}]: ${s}`);
         return false;
       }
       if (typeof act === "object" && act.isBrother) hasBrother = true;
     }
 
     if (s !== answer) {
-      console.warn(`❌ validateExample: ответ не совпадает: ${s} !== ${answer}`);
+      this._warn(`❌ validateExample: ответ не совпадает: ${s} !== ${answer}`);
       return false;
     }
 
     if (!hasBrother) {
-      console.warn("❌ validateExample: нет братских шагов");
+      this._warn("❌ validateExample: нет братских шагов");
       return false;
     }
 
-    console.log(`✅ validateExample: пример валидный (${steps.length} шагов, есть братские)`);
+    this._log(`✅ validateExample: пример валидный (${steps.length} шагов, есть братские)`);
     return true;
   }
 }

@@ -199,7 +199,7 @@ if (!settings.silent)     console.log(`🔍 [generator] Проверка акт�
 
       // доступ к верхней бусине (формирует режим "Просто 4" vs "Просто 5")
       includeFive: includeFive,
-      hasFive: includeFive, // совместимость со старым кодом
+      hasFive: includeFive, // совместимость со старым кодом,
 
       // ограничения направления
       onlyAddition: onlyAddition,
@@ -215,7 +215,10 @@ if (!settings.silent)     console.log(`🔍 [generator] Проверка акт�
 
       // передаём исходный блок настроек целиком (UI),
       // чтобы правило при желании могло подсмотреть детали
-      blocks: blocks
+      blocks: blocks,
+
+      // флаг тихого режима для подавления логов
+      silent: settings.silent || false
     };
 
 if (!settings.silent)     console.log(
@@ -319,7 +322,8 @@ if (!settings.silent)       console.log("   📌 Только вычитание
         maxSteps: maxSteps,
         digitCount: 1, // Базовое правило всегда для 1 разряда
         combineLevels: combineLevels,
-        blocks: blocks
+        blocks: blocks,
+        silent: settings.silent || false  // Флаг тихого режима
       };
 
     } else {
