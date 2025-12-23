@@ -297,23 +297,26 @@ export class FriendsExampleGenerator {
       const currentVal = states[pos] || 0;
       const possibleDigits = [];
 
-      // Собираем все возможные цифры для этого разряда
+      // Для нецелевых разрядов НЕ требуем строгое правило Просто - просто проверяем допустимость
       for (let d = 0; d <= 9; d++) {
         if (isAddition) {
-          if (currentVal + d <= 9 && (d === 0 || this._canPlusDirect(currentVal, d))) {
+          // Для сложения: просто проверяем что не выходим за пределы
+          if (currentVal + d <= 9) {
             possibleDigits.push(d);
           }
         } else {
-          if (currentVal >= d && (d === 0 || this._canMinusDirect(currentVal, d))) {
+          // Для вычитания: просто проверяем что не уходим в минус
+          if (currentVal >= d) {
             possibleDigits.push(d);
           }
         }
       }
 
       if (possibleDigits.length > 0) {
-        // Предпочитаем ненулевые цифры с вероятностью 50%
+        // ВСЕГДА предпочитаем ненулевые цифры, если они доступны
+        // Используем 0 ТОЛЬКО если других вариантов нет
         const nonZero = possibleDigits.filter(d => d > 0);
-        const candidates = nonZero.length > 0 && Math.random() < 0.5 ? nonZero : possibleDigits;
+        const candidates = nonZero.length > 0 ? nonZero : possibleDigits;
         actionDigits[pos] = candidates[Math.floor(Math.random() * candidates.length)];
       }
     }
