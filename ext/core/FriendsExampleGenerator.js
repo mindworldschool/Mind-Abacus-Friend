@@ -39,8 +39,8 @@ export class FriendsExampleGenerator {
         ? config.selectedDigits.map(n => parseInt(n, 10)).filter(n => n >= 1 && n <= 9)
         : [1, 2, 3, 4, 5, 6, 7, 8, 9],
 
-      // Разрядность (минимум 2 для правила Друзья)
-      digitCount: Math.max(2, config.digitCount || 2),
+      // Разрядность ДЕЙСТВИЙ (1 для однозначных, 2 для двузначных и т.д.)
+      digitCount: config.digitCount || 1,
 
       // ТОЧНОЕ количество шагов (не диапазон!)
       stepsCount: config.stepsCount || config.maxSteps || 7,
@@ -72,11 +72,12 @@ export class FriendsExampleGenerator {
       this.config.selectedDigits = [1];
     }
 
-    if (this.config.digitCount < 2) {
+    // Проверяем что digitCount >= 1
+    if (this.config.digitCount < 1) {
       if (!this.config.silent) {
-        console.warn("⚠️ FriendsExampleGenerator: правило Друзья требует минимум 2 разряда! Устанавливаем 2");
+        console.warn("⚠️ FriendsExampleGenerator: digitCount должен быть >= 1! Устанавливаем 1");
       }
-      this.config.digitCount = 2;
+      this.config.digitCount = 1;
     }
 
     // МИНИМУМ для правила Друзья: 4 шага
@@ -89,11 +90,19 @@ export class FriendsExampleGenerator {
       this.config.stepsCount = MIN_STEPS_FOR_FRIENDS;
     }
 
-    // ЦЕЛЕВОЙ РАЗРЯД = самый старший (digitCount - 1)
+    // РАЗРЯДНОСТЬ СОСТОЯНИЯ = digitCount + 1 (дополнительный разряд для переноса)
+    // Примеры:
+    //   digitCount=1 (действия однозначные) → stateDigitCount=2 [единицы, десятки]
+    //   digitCount=2 (действия двузначные)  → stateDigitCount=3 [единицы, десятки, сотни]
+    //   digitCount=3 (действия трехзначные) → stateDigitCount=4 [единицы, десятки, сотни, тысячи]
+    this.stateDigitCount = this.config.digitCount + 1;
+
+    // ЦЕЛЕВОЙ РАЗРЯД = самый старший разряд ДЕЙСТВИЯ (digitCount - 1)
+    // Это разряд где применяется правило "Друзья"
     this.targetPosition = this.config.digitCount - 1;
 
     // РАСШИРЕННЫЙ ДИАПАЗОН (промежуточные результаты могут расти)
-    this.maxValue = Math.pow(10, this.config.digitCount + 1) - 1;
+    this.maxValue = Math.pow(10, this.stateDigitCount + 1) - 1;
 
     // Трекинг использования цифр Friends для разнообразия
     this.digitUsageCount = {};
@@ -104,7 +113,8 @@ export class FriendsExampleGenerator {
     this._log(`🤝 FriendsExampleGenerator создан:
   Выбранные цифры Друзья: [${this.config.selectedDigits.join(', ')}]
   Простые цифры: [${this.config.simpleDigits.join(', ')}]
-  Разрядность: ${this.config.digitCount}
+  Разрядность действий: ${this.config.digitCount}
+  Разрядность состояния: ${this.stateDigitCount}
   Целевой разряд: ${this.targetPosition} (${this._getPositionName(this.targetPosition)})
   Точное количество шагов: ${this.config.stepsCount}
   Максимальное значение: ${this.maxValue}
@@ -534,8 +544,8 @@ export class FriendsExampleGenerator {
    * Генерация одной попытки примера
    */
   _generateAttempt() {
-    // Инициализация
-    let states = Array(this.config.digitCount).fill(0);
+    // Инициализация состояния (с дополнительным разрядом для переноса)
+    let states = Array(this.stateDigitCount).fill(0);
     const steps = [];
     const targetSteps = this.config.stepsCount; // ТОЧНОЕ количество
 
@@ -639,7 +649,7 @@ export class FriendsExampleGenerator {
     }
 
     return {
-      start: Array(this.config.digitCount).fill(0),
+      start: Array(this.stateDigitCount).fill(0),
       steps,
       answer: [...states]
     };
@@ -1068,7 +1078,7 @@ export class FriendsExampleGenerator {
    */
   _fallbackExample() {
     const steps = [];
-    let states = Array(this.config.digitCount).fill(0);
+    let states = Array(this.stateDigitCount).fill(0);
     const targetSteps = this.config.stepsCount;
 
     if (!this.config.silent) {
@@ -1608,9 +1618,9 @@ export class FriendsExampleGenerator {
     this._log(`📊 Fallback результат: ${finalSteps.length} шагов, ${friendsAdded} Friends`);
 
     return {
-      start: Array(this.config.digitCount).fill(0),
+      start: Array(this.stateDigitCount).fill(0),
       steps: finalSteps,
-      answer: finalSteps.length > 0 ? [...finalSteps[finalSteps.length - 1].states] : Array(this.config.digitCount).fill(0)
+      answer: finalSteps.length > 0 ? [...finalSteps[finalSteps.length - 1].states] : Array(this.stateDigitCount).fill(0)
     };
   }
 

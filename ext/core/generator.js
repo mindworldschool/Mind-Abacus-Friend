@@ -274,13 +274,16 @@ if (!settings.silent)       console.log("   📌 Только вычитание
         .map(d => parseInt(d, 10))
         .filter(n => n >= 1 && n <= 9);
 
-      // Определяем разрядность (минимум 2 для правила Друзья)
-      const friendsDigitCount = Math.max(2, digitCount);
+      // FriendsExampleGenerator сам создаст дополнительный разряд для переноса
+      // digitCount передаем оригинальный - это разрядность ДЕЙСТВИЙ:
+      //   digitCount=1 → действия +1..+9 (однозначные), состояние 2 разряда
+      //   digitCount=2 → действия +10..+99 (двузначные), состояние 3 разряда
+      //   digitCount=3 → действия +100..+999 (трехзначные), состояние 4 разряда
 
       // Создаём специализированный генератор
       const friendsGenerator = new FriendsExampleGenerator({
         selectedDigits: selectedFriendsDigits.length > 0 ? selectedFriendsDigits : [1],
-        digitCount: friendsDigitCount,
+        digitCount: digitCount, // ← Передаем разрядность ДЕЙСТВИЙ (не состояния!)
         minSteps: minSteps,
         maxSteps: maxSteps,
         onlyAddition: blocks?.friends?.onlyAddition ?? false,
