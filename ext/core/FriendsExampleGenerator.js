@@ -589,10 +589,10 @@ export class FriendsExampleGenerator {
     // Переход на fallback (не критическая ошибка - fallback всегда работает)
     this._warn(`❌ Не удалось сгенерировать пример за ${maxAttempts} попыток!`);
 
-    // Попытки fallback с минимизацией круглых чисел
-    const maxFallbackAttempts = 10;
+    // Попытки fallback с минимизацией круглых чисел и улучшенной оценкой качества
+    const maxFallbackAttempts = 30; // Увеличено с 10 до 30 для лучшего качества
     let bestExample = null;
-    let bestRoundCount = Infinity;
+    let bestScore = Infinity; // Чем ниже счет, тем лучше
 
     for (let attempt = 0; attempt < maxFallbackAttempts; attempt++) {
       const example = this._fallbackExample();
@@ -601,14 +601,37 @@ export class FriendsExampleGenerator {
       // Подсчет круглых чисел (оканчивающихся на 0)
       const roundCount = example.steps.filter(s => Math.abs(s.action) % 10 === 0).length;
 
-      // Если найден идеальный вариант (0-1 круглых), сразу возвращаем
-      if (roundCount <= 1) {
+      // Штраф за подряд идущие круглые числа
+      let consecutiveRoundPenalty = 0;
+      for (let i = 0; i < example.steps.length - 1; i++) {
+        if (Math.abs(example.steps[i].action) % 10 === 0 &&
+            Math.abs(example.steps[i + 1].action) % 10 === 0) {
+          consecutiveRoundPenalty += 5; // Большой штраф за подряд идущие круглые
+        }
+      }
+
+      // Штраф за финальный ответ на 9
+      const finalAnswer = example.answer || this.stateToNumber(example.steps[example.steps.length - 1].states);
+      const endsIn9 = finalAnswer % 10 === 9;
+      const endsPenalty = endsIn9 ? 3 : 0;
+
+      // Бонус за разнообразие знаков (+ и -)
+      const plusCount = example.steps.filter(s => s.action > 0).length;
+      const minusCount = example.steps.filter(s => s.action < 0).length;
+      const signDiversity = Math.abs(plusCount - minusCount);
+      const diversityPenalty = signDiversity > 5 ? signDiversity : 0; // Штраф если слишком перекошено
+
+      // Общий счет (чем ниже, тем лучше)
+      const score = roundCount * 10 + consecutiveRoundPenalty + endsPenalty + diversityPenalty;
+
+      // Если найден отличный вариант (0 круглых), сразу возвращаем
+      if (roundCount === 0 && consecutiveRoundPenalty === 0) {
         return example;
       }
 
       // Сохраняем лучший вариант
-      if (roundCount < bestRoundCount) {
-        bestRoundCount = roundCount;
+      if (score < bestScore) {
+        bestScore = score;
         bestExample = example;
       }
     }
