@@ -587,7 +587,32 @@ export class FriendsExampleGenerator {
 
     // Переход на fallback (не критическая ошибка - fallback всегда работает)
     this._warn(`❌ Не удалось сгенерировать пример за ${maxAttempts} попыток!`);
-    return this._fallbackExample();
+
+    // Попытки fallback с минимизацией круглых чисел
+    const maxFallbackAttempts = 10;
+    let bestExample = null;
+    let bestRoundCount = Infinity;
+
+    for (let attempt = 0; attempt < maxFallbackAttempts; attempt++) {
+      const example = this._fallbackExample();
+      if (!example || !example.steps) continue;
+
+      // Подсчет круглых чисел (оканчивающихся на 0)
+      const roundCount = example.steps.filter(s => Math.abs(s.action) % 10 === 0).length;
+
+      // Если найден идеальный вариант (0-1 круглых), сразу возвращаем
+      if (roundCount <= 1) {
+        return example;
+      }
+
+      // Сохраняем лучший вариант
+      if (roundCount < bestRoundCount) {
+        bestRoundCount = roundCount;
+        bestExample = example;
+      }
+    }
+
+    return bestExample || this._fallbackExample();
   }
 
   /**
