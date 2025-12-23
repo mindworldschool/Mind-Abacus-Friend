@@ -276,6 +276,53 @@ export class FriendsExampleGenerator {
   // ========== СЕКЦИЯ 2: МНОГОЗНАЧНЫЕ ДЕЙСТВИЯ ==========
 
   /**
+   * Добавляет случайные цифры к базовому действию для нецелевых разрядов
+   *
+   * Например: baseAction = +300 (целевой разряд 2), states = [5, 3, 0]
+   * Результат: +347 где 4 для десятков, 7 для единиц (подобраны по правилу Просто)
+   *
+   * @param {number} baseAction - базовое действие (например +300, -200)
+   * @param {number[]} states - текущее состояние
+   * @param {boolean} isFriend - это Friends действие?
+   * @returns {number} - полное многозначное действие с заполненными разрядами
+   */
+  _addRandomDigitsToAction(baseAction, states, isFriend = false) {
+    const isAddition = baseAction >= 0;
+    const actionDigits = this._numberToDigits(Math.abs(baseAction), this.config.digitCount);
+
+    // Для каждого нецелевого разряда пытаемся добавить случайную цифру
+    for (let pos = 0; pos < this.config.digitCount; pos++) {
+      if (pos === this.targetPosition) continue; // Целевой разряд не трогаем
+
+      const currentVal = states[pos] || 0;
+      const possibleDigits = [];
+
+      // Собираем все возможные цифры для этого разряда
+      for (let d = 0; d <= 9; d++) {
+        if (isAddition) {
+          if (currentVal + d <= 9 && (d === 0 || this._canPlusDirect(currentVal, d))) {
+            possibleDigits.push(d);
+          }
+        } else {
+          if (currentVal >= d && (d === 0 || this._canMinusDirect(currentVal, d))) {
+            possibleDigits.push(d);
+          }
+        }
+      }
+
+      if (possibleDigits.length > 0) {
+        // Предпочитаем ненулевые цифры с вероятностью 50%
+        const nonZero = possibleDigits.filter(d => d > 0);
+        const candidates = nonZero.length > 0 && Math.random() < 0.5 ? nonZero : possibleDigits;
+        actionDigits[pos] = candidates[Math.floor(Math.random() * candidates.length)];
+      }
+    }
+
+    const result = this._digitsToNumber(actionDigits);
+    return isAddition ? result : -result;
+  }
+
+  /**
    * Разбить число на цифры по разрядам
    *
    * Пример: 123 → [3, 2, 1] (младшие разряды первые)
@@ -1120,16 +1167,17 @@ export class FriendsExampleGenerator {
         : this.config.simpleDigits[Math.floor(Math.random() * this.config.simpleDigits.length)];
 
       if (smartStartDigit > 0) {
-        const smartStart = smartStartDigit * multiplier; // Многозначное!
-        const newStates = this._applyAction(states, { value: smartStart, isFriend: false });
+        const baseAction = smartStartDigit * multiplier; // Базовое действие для целевого разряда
+        const fullAction = this._addRandomDigitsToAction(baseAction, states, false); // Добавляем цифры для остальных разрядов
+        const newStates = this._applyAction(states, { value: fullAction, isFriend: false });
         if (newStates && this._isValidState(newStates)) {
           steps.push({
-            action: smartStart,
+            action: fullAction,
             isFriend: false,
             states: [...newStates]
           });
           states = newStates;
-          this._log(`🎯 Случайное начало: +${smartStart} (из simpleDigits), состояние: [${newStates.join(', ')}]`);
+          this._log(`🎯 Случайное начало: +${fullAction} (база: ${baseAction}, с дополнительными разрядами), состояние: [${newStates.join(', ')}]`);
         }
       }
     }
@@ -1184,18 +1232,19 @@ export class FriendsExampleGenerator {
 
             // Проверяем: можем ли добавить по правилу Просто?
             if (this._canPlusDirect(currentTarget, tryDigit)) {
-              const action = tryDigit * multiplier; // Многозначное действие!
-              const newStates = this._applyAction(states, { value: action, isFriend: false });
+              const baseAction = tryDigit * multiplier; // Базовое действие для целевого разряда
+              const fullAction = this._addRandomDigitsToAction(baseAction, states, false); // Добавляем цифры для остальных разрядов
+              const newStates = this._applyAction(states, { value: fullAction, isFriend: false });
 
               if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
                 steps.push({
-                  action: action,
+                  action: fullAction,
                   isFriend: false,
                   states: [...newStates]
                 });
                 states = newStates;
                 added = true;
-                this._log(`➕ Подготовка: +${action}, состояние: [${newStates.join(', ')}]`);
+                this._log(`➕ Подготовка: +${fullAction}, состояние: [${newStates.join(', ')}]`);
                 break;
               }
             }
@@ -1216,10 +1265,11 @@ export class FriendsExampleGenerator {
               let stepAdded = false;
               for (const tryDigit of simpleDigitsDesc) {
                 if (tempTargetVal + tryDigit <= 9 && this._canPlusDirect(tempTargetVal, tryDigit)) {
-                  const action = tryDigit * multiplier;
-                  const newStates = this._applyAction(tempStates, { value: action, isFriend: false });
+                  const baseAction = tryDigit * multiplier;
+                  const fullAction = this._addRandomDigitsToAction(baseAction, tempStates, false);
+                  const newStates = this._applyAction(tempStates, { value: fullAction, isFriend: false });
                   if (newStates && this._isValidState(newStates)) {
-                    allTempSteps.push({ action: action, isFriend: false, states: [...newStates] });
+                    allTempSteps.push({ action: fullAction, isFriend: false, states: [...newStates] });
                     tempStates = newStates;
                     tempTargetVal = newStates[this.targetPosition] || 0;
                     stepAdded = true;
@@ -1241,10 +1291,11 @@ export class FriendsExampleGenerator {
 
                 for (const tryDigit of simpleDigitsDesc) {
                   if (tryDigit <= toRemove && this._canMinusDirect(tempTargetVal, tryDigit)) {
-                    const action = -tryDigit * multiplier;
-                    const newStates = this._applyAction(tempStates, { value: action, isFriend: false });
+                    const baseAction = -tryDigit * multiplier;
+                    const fullAction = this._addRandomDigitsToAction(baseAction, tempStates, false);
+                    const newStates = this._applyAction(tempStates, { value: fullAction, isFriend: false });
                     if (newStates && this._isValidState(newStates)) {
-                      allTempSteps.push({ action: action, isFriend: false, states: [...newStates] });
+                      allTempSteps.push({ action: fullAction, isFriend: false, states: [...newStates] });
                       tempStates = newStates;
                       tempTargetVal = newStates[this.targetPosition] || 0;
                       stepAdded = true;
@@ -1285,18 +1336,19 @@ export class FriendsExampleGenerator {
 
             // Проверяем: можем ли убрать по правилу Просто?
             if (this._canMinusDirect(currentTarget, tryDigit)) {
-              const action = -tryDigit * multiplier;
-              const newStates = this._applyAction(states, { value: action, isFriend: false });
+              const baseAction = -tryDigit * multiplier;
+              const fullAction = this._addRandomDigitsToAction(baseAction, states, false);
+              const newStates = this._applyAction(states, { value: fullAction, isFriend: false });
 
               if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
                 steps.push({
-                  action: action,
+                  action: fullAction,
                   isFriend: false,
                   states: [...newStates]
                 });
                 states = newStates;
                 removed = true;
-                this._log(`➖ Подготовка: ${action}, состояние: [${newStates.join(', ')}]`);
+                this._log(`➖ Подготовка: ${fullAction}, состояние: [${newStates.join(', ')}]`);
                 break;
               }
             }
@@ -1317,10 +1369,11 @@ export class FriendsExampleGenerator {
               let stepAdded = false;
               for (const tryDigit of simpleDigitsDesc) {
                 if (tempTargetVal >= tryDigit && this._canMinusDirect(tempTargetVal, tryDigit)) {
-                  const action = -tryDigit * multiplier;
-                  const newStates = this._applyAction(tempStates, { value: action, isFriend: false });
+                  const baseAction = -tryDigit * multiplier;
+                  const fullAction = this._addRandomDigitsToAction(baseAction, tempStates, false);
+                  const newStates = this._applyAction(tempStates, { value: fullAction, isFriend: false });
                   if (newStates && this._isValidState(newStates)) {
-                    allTempSteps.push({ action: action, isFriend: false, states: [...newStates] });
+                    allTempSteps.push({ action: fullAction, isFriend: false, states: [...newStates] });
                     tempStates = newStates;
                     tempTargetVal = newStates[this.targetPosition] || 0;
                     stepAdded = true;
@@ -1342,10 +1395,11 @@ export class FriendsExampleGenerator {
 
                 for (const tryDigit of simpleDigitsDesc) {
                   if (tryDigit <= toAdd && this._canPlusDirect(tempTargetVal, tryDigit)) {
-                    const action = tryDigit * multiplier;
-                    const newStates = this._applyAction(tempStates, { value: action, isFriend: false });
+                    const baseAction = tryDigit * multiplier;
+                    const fullAction = this._addRandomDigitsToAction(baseAction, tempStates, false);
+                    const newStates = this._applyAction(tempStates, { value: fullAction, isFriend: false });
                     if (newStates && this._isValidState(newStates)) {
-                      allTempSteps.push({ action: action, isFriend: false, states: [...newStates] });
+                      allTempSteps.push({ action: fullAction, isFriend: false, states: [...newStates] });
                       tempStates = newStates;
                       tempTargetVal = newStates[this.targetPosition] || 0;
                       stepAdded = true;
@@ -1388,20 +1442,21 @@ export class FriendsExampleGenerator {
       // Например, из 6 (U=1,L=1) вычесть -2 НЕЛЬЗЯ по Просто (это МИКС!)
       if (currentTarget === targetTargetVal && this._canMinusDirect(currentTarget, friend) && steps.length < targetSteps) {
         // Применяем Friends через _applyAction - он правильно обработает целевой разряд
-        const friendAction = friendDigit * multiplier; // МНОГОЗНАЧНОЕ действие!
-        const newStates = this._applyAction(states, { value: friendAction, isFriend: true });
+        const baseFriendAction = friendDigit * multiplier; // Базовое Friends действие для целевого разряда
+        const fullFriendAction = this._addRandomDigitsToAction(baseFriendAction, states, true); // Добавляем цифры для остальных разрядов
+        const newStates = this._applyAction(states, { value: fullFriendAction, isFriend: true });
 
         if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
           steps.push({
-            action: friendAction,
+            action: fullFriendAction,
             isFriend: true,
             friendN: friendDigit,
-            formula: this._buildFormula(friendAction, this.targetPosition),
+            formula: this._buildFormula(fullFriendAction, this.targetPosition),
             states: [...newStates]
           });
           states = newStates;
           friendsAdded++;
-          this._log(`✅ Friends #${friendsAdded} добавлен: +${friendAction} (формула: +${Math.pow(10, this.targetPosition + 1)}-${friend * multiplier}), состояние: [${newStates.join(', ')}]`);
+          this._log(`✅ Friends #${friendsAdded} добавлен: +${fullFriendAction} (база: ${baseFriendAction}, с дополнительными разрядами), состояние: [${newStates.join(', ')}]`);
 
           // ШАГ 2.3: Добавляем 1-2 простых шага после Friends для разнообразия
           const simpleStepsAfter = friendsAdded < maxFriends ? (Math.floor(Math.random() * 2) + 1) : 0; // 1-2 шага, или 0 если это последний Friends
@@ -1409,34 +1464,36 @@ export class FriendsExampleGenerator {
             const currentTargetVal = states[this.targetPosition] || 0;
             // Выбираем случайное действие из разрешенных simpleDigits
             const randomDigit = this.config.simpleDigits[Math.floor(Math.random() * this.config.simpleDigits.length)];
-            const randomAction = randomDigit * multiplier;
+            const baseRandomAction = randomDigit * multiplier;
 
             // Пробуем добавить
             if (currentTargetVal + randomDigit <= 9 && this._canPlusDirect(currentTargetVal, randomDigit)) {
-              const newSimpleStates = this._applyAction(states, { value: randomAction, isFriend: false });
+              const fullRandomAction = this._addRandomDigitsToAction(baseRandomAction, states, false);
+              const newSimpleStates = this._applyAction(states, { value: fullRandomAction, isFriend: false });
               if (newSimpleStates && this._isValidState(newSimpleStates)) {
                 steps.push({
-                  action: randomAction,
+                  action: fullRandomAction,
                   isFriend: false,
                   states: [...newSimpleStates]
                 });
                 states = newSimpleStates;
-                this._log(`  ➕ Простой шаг: +${randomAction}, состояние: [${newSimpleStates.join(', ')}]`);
+                this._log(`  ➕ Простой шаг: +${fullRandomAction}, состояние: [${newSimpleStates.join(', ')}]`);
                 continue;
               }
             }
 
             // Если не можем добавить - пробуем вычесть
             if (currentTargetVal > 0 && currentTargetVal >= randomDigit && this._canMinusDirect(currentTargetVal, randomDigit)) {
-              const newSimpleStates = this._applyAction(states, { value: -randomAction, isFriend: false });
+              const fullRandomAction = this._addRandomDigitsToAction(-baseRandomAction, states, false);
+              const newSimpleStates = this._applyAction(states, { value: fullRandomAction, isFriend: false });
               if (newSimpleStates && this._isValidState(newSimpleStates)) {
                 steps.push({
-                  action: -randomAction,
+                  action: fullRandomAction,
                   isFriend: false,
                   states: [...newSimpleStates]
                 });
                 states = newSimpleStates;
-                this._log(`  ➖ Простой шаг: ${-randomAction}, состояние: [${newSimpleStates.join(', ')}]`);
+                this._log(`  ➖ Простой шаг: ${fullRandomAction}, состояние: [${newSimpleStates.join(', ')}]`);
               }
             }
           }
@@ -1476,7 +1533,7 @@ export class FriendsExampleGenerator {
     while (steps.length < targetSteps && failedAttempts < maxFailedAttempts) {
       const targetVal = states[this.targetPosition] || 0;
       const digit = simpleActions[actionIndex % simpleActions.length];
-      const action = digit * multiplier; // Многозначное действие!
+      const baseAction = digit * multiplier; // Базовое действие для целевого разряда
 
       // Случайный выбор: сначала сложение или вычитание?
       const tryAdditionFirst = Math.random() < 0.5;
@@ -1484,11 +1541,12 @@ export class FriendsExampleGenerator {
       if (tryAdditionFirst) {
         // Пробуем добавить к целевому разряду
         if (targetVal + digit <= 9 && this._canPlusDirect(targetVal, digit)) {
-          const newStates = this._applyAction(states, { value: action, isFriend: false });
+          const fullAction = this._addRandomDigitsToAction(baseAction, states, false);
+          const newStates = this._applyAction(states, { value: fullAction, isFriend: false });
 
           if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
             steps.push({
-              action: action,
+              action: fullAction,
               isFriend: false,
               states: [...newStates]
             });
@@ -1501,11 +1559,12 @@ export class FriendsExampleGenerator {
 
         // Если не можем добавить - пробуем вычитание
         if (targetVal > 0 && targetVal >= digit && this._canMinusDirect(targetVal, digit)) {
-          const newStates = this._applyAction(states, { value: -action, isFriend: false });
+          const fullAction = this._addRandomDigitsToAction(-baseAction, states, false);
+          const newStates = this._applyAction(states, { value: fullAction, isFriend: false });
 
           if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
             steps.push({
-              action: -action,
+              action: fullAction,
               isFriend: false,
               states: [...newStates]
             });
@@ -1518,11 +1577,12 @@ export class FriendsExampleGenerator {
       } else {
         // Пробуем вычитание первым
         if (targetVal > 0 && targetVal >= digit && this._canMinusDirect(targetVal, digit)) {
-          const newStates = this._applyAction(states, { value: -action, isFriend: false });
+          const fullAction = this._addRandomDigitsToAction(-baseAction, states, false);
+          const newStates = this._applyAction(states, { value: fullAction, isFriend: false });
 
           if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
             steps.push({
-              action: -action,
+              action: fullAction,
               isFriend: false,
               states: [...newStates]
             });
@@ -1535,11 +1595,12 @@ export class FriendsExampleGenerator {
 
         // Если не можем вычесть - пробуем добавить
         if (targetVal + digit <= 9 && this._canPlusDirect(targetVal, digit)) {
-          const newStates = this._applyAction(states, { value: action, isFriend: false });
+          const fullAction = this._addRandomDigitsToAction(baseAction, states, false);
+          const newStates = this._applyAction(states, { value: fullAction, isFriend: false });
 
           if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
             steps.push({
-              action: action,
+              action: fullAction,
               isFriend: false,
               states: [...newStates]
             });
@@ -1561,13 +1622,14 @@ export class FriendsExampleGenerator {
 
       // Последняя попытка: минимальное действие из simpleDigits если возможно
       const minSimpleDigit = Math.min(...this.config.simpleDigits);
-      const minAction = minSimpleDigit * multiplier;
+      const minBaseAction = minSimpleDigit * multiplier;
       if (targetVal + minSimpleDigit <= 9 && this._canPlusDirect(targetVal, minSimpleDigit)) {
-        const newStates = this._applyAction(states, { value: minAction, isFriend: false });
+        const minFullAction = this._addRandomDigitsToAction(minBaseAction, states, false);
+        const newStates = this._applyAction(states, { value: minFullAction, isFriend: false });
 
         if (newStates && this._isValidState(newStates)) {
           steps.push({
-            action: minAction,
+            action: minFullAction,
             isFriend: false,
             states: [...newStates]
           });
