@@ -297,16 +297,17 @@ export class FriendsExampleGenerator {
       const currentVal = states[pos] || 0;
       const possibleDigits = [];
 
-      // Для нецелевых разрядов НЕ требуем строгое правило Просто - просто проверяем допустимость
+      // КРИТИЧНО: Для нецелевых разрядов ОБЯЗАТЕЛЬНО проверяем правило Просто!
+      // Без этого генерируются невозможные действия на абакусе (например 4+2 требует Братья)
       for (let d = 0; d <= 9; d++) {
         if (isAddition) {
-          // Для сложения: просто проверяем что не выходим за пределы
-          if (currentVal + d <= 9) {
+          // Для сложения: проверяем границы И правило Просто (однонаправленное движение)
+          if (currentVal + d <= 9 && (d === 0 || this._canPlusDirect(currentVal, d))) {
             possibleDigits.push(d);
           }
         } else {
-          // Для вычитания: просто проверяем что не уходим в минус
-          if (currentVal >= d) {
+          // Для вычитания: проверяем границы И правило Просто
+          if (currentVal >= d && (d === 0 || this._canMinusDirect(currentVal, d))) {
             possibleDigits.push(d);
           }
         }
