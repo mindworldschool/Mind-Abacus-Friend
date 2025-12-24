@@ -687,8 +687,10 @@ export class FriendsExampleGenerator {
           const newStates = this._applyAction(states, friendAction);
 
           if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+            const signStr = friendAction.value >= 0 ? '+' : '';
             steps.push({
               action: friendAction.value,
+              step: `${signStr}${friendAction.value}`,  // ✅ Добавлено для печати
               isFriend: true,
               friendN: Math.abs(this._numberToDigits(Math.abs(friendAction.value), this.config.digitCount)[this.targetPosition]),
               formula: this._buildFormula(friendAction.value, this.targetPosition),
@@ -1499,8 +1501,10 @@ export class FriendsExampleGenerator {
         const newStates = this._applyAction(states, { value: fullFriendAction, isFriend: true });
 
         if (newStates && this._isValidState(newStates) && !this._checkOverflow(newStates)) {
+          const signStr = fullFriendAction >= 0 ? '+' : '';
           steps.push({
             action: fullFriendAction,
+            step: `${signStr}${fullFriendAction}`,  // ✅ Добавлено для печати
             isFriend: true,
             friendN: friendDigit,
             formula: this._buildFormula(fullFriendAction, this.targetPosition),
