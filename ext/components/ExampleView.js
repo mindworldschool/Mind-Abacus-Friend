@@ -109,23 +109,36 @@ export class ExampleView {
     // Применяем стили к контейнеру
     this.container.style.fontSize = `${fontSize}px`;
     this.container.style.lineHeight = `${lineHeight}px`;
-    this.container.style.width = `${finalWidth}px`;
-    this.container.style.minWidth = `${baseWidth}px`;
-    this.container.style.maxWidth = `${maxWidth}px`;
-    
-    // 🔥 ВСЕГДА ВЫРАВНИВАНИЕ СЛЕВА
-    this.container.style.textAlign = 'left';
-    this.container.style.justifyContent = 'flex-start';
-    
-    // 🔥 СКРОЛЛ ДЛЯ ДЛИННЫХ СПИСКОВ
-    if (stepsArray.length > maxVisibleLines) {
-      this.container.style.maxHeight = `${maxHeight}px`;
-      this.container.style.overflowY = 'auto';
-      this.container.style.overflowX = 'hidden';
-      console.log(`📜 Включён скролл: ${stepsArray.length} действий > ${maxVisibleLines}`);
-    } else {
+
+    // 🔥 РАЗНАЯ ЛОГИКА ДЛЯ INLINE И COLUMN
+    if (this.displayMode === 'inline') {
+      // Режим "в строку" - на всю ширину, по центру
+      this.container.style.width = '100%';
+      this.container.style.minWidth = 'auto';
+      this.container.style.maxWidth = 'none';
+      this.container.style.textAlign = 'center';
+      this.container.style.justifyContent = 'center';
       this.container.style.maxHeight = 'none';
       this.container.style.overflowY = 'visible';
+      this.container.style.overflowX = 'auto';
+    } else {
+      // Режим "столбик" - адаптивная ширина, выравнивание слева
+      this.container.style.width = `${finalWidth}px`;
+      this.container.style.minWidth = `${baseWidth}px`;
+      this.container.style.maxWidth = `${maxWidth}px`;
+      this.container.style.textAlign = 'left';
+      this.container.style.justifyContent = 'flex-start';
+
+      // 🔥 СКРОЛЛ ДЛЯ ДЛИННЫХ СПИСКОВ (только в режиме столбик)
+      if (stepsArray.length > maxVisibleLines) {
+        this.container.style.maxHeight = `${maxHeight}px`;
+        this.container.style.overflowY = 'auto';
+        this.container.style.overflowX = 'hidden';
+        console.log(`📜 Включён скролл: ${stepsArray.length} действий > ${maxVisibleLines}`);
+      } else {
+        this.container.style.maxHeight = 'none';
+        this.container.style.overflowY = 'visible';
+      }
     }
 
     // 🔥 ОТСТУПЫ ВНУТРИ ОКНА
@@ -161,11 +174,11 @@ export class ExampleView {
     const line = document.createElement("div");
     line.className = "example__line example__line--inline";
     line.textContent = steps.join(" ");
-    
-    // 🔥 ВСЕГДА СЛЕВА
-    line.style.textAlign = 'left';
-    line.style.width = '100%';
-    
+
+    // 🔥 В СТРОКУ - ПО ЦЕНТРУ
+    line.style.textAlign = 'center';
+    line.style.whiteSpace = 'nowrap';
+
     this.container.appendChild(line);
   }
 
