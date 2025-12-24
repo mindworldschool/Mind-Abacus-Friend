@@ -397,10 +397,8 @@ export function openWorksheetPrintWindow(options = {}) {
         for (let col = 0; col < EXAMPLES_PER_TABLE; col++) {
           const ex = pageExamples[col];
           const stepData = ex && ex.steps && ex.steps[row];
-          // Для Friends/Brothers шагов (объекты) берем поле step, для обычных шагов (строки) используем как есть
-          const step = stepData
-            ? (typeof stepData === 'object' && stepData !== null ? stepData.step : String(stepData))
-            : '';
+          // ✅ Используем функцию formatStepForPrint для поддержки Simple, Brothers и Friends
+          const step = formatStepForPrint(stepData);
           doc.write(`<td class="examples-table__cell">${escapeHtml(step)}</td>`);
         }
 
@@ -588,4 +586,32 @@ function safeNumber(value) {
   const num = Number(value);
   if (!Number.isFinite(num)) return "-";
   return String(num);
+}
+
+/**
+ * Форматирует шаг для печати, поддерживая Simple, Brothers и Friends.
+ * ✅ Fallback для Friends без поля step (обратная совместимость)
+ */
+function formatStepForPrint(stepData) {
+  // Пустой шаг
+  if (!stepData) return '';
+
+  // Simple - строка вида "+3", "-7"
+  if (typeof stepData !== 'object') {
+    return String(stepData);
+  }
+
+  // Brothers/Friends - объекты с полем step
+  if (stepData.step) {
+    return stepData.step;
+  }
+
+  // ✅ FALLBACK для Friends без поля step (старые данные)
+  if (stepData.isFriend && stepData.action !== undefined) {
+    const sign = stepData.action >= 0 ? '+' : '';
+    return `${sign}${stepData.action}`;
+  }
+
+  // Другие случаи - пустая строка
+  return '';
 }
