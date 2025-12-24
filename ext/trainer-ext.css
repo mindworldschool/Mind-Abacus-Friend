@@ -126,13 +126,17 @@
 }
 
 .example--inline {
-  display: block !important;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  align-items: center !important;
   font-size: clamp(20px, 3vw, 32px);
   line-height: 1.4;
-  word-break: keep-all;
-  overflow-wrap: anywhere;
+  width: 100% !important;
   text-align: center;
-  white-space: normal;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .example__line {
@@ -148,7 +152,10 @@
 }
 
 .example__line--inline {
-  word-wrap: break-word;
+  white-space: nowrap;
+  word-wrap: normal;
+  text-align: center;
+  width: auto;
 }
 
 /* ========================================
