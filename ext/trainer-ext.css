@@ -126,11 +126,13 @@
 }
 
 .example--inline {
+  display: block !important;
   font-size: clamp(20px, 3vw, 32px);
   line-height: 1.4;
   word-break: keep-all;
   overflow-wrap: anywhere;
   text-align: center;
+  white-space: normal;
 }
 
 .example__line {

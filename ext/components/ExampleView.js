@@ -27,7 +27,7 @@ export class ExampleView {
   render(steps, mode = null) {
     // ✅ Останавливаем анимацию если она была
     this.stopAnimation();
-    
+
     if (mode) {
       this.setDisplayMode(mode);
     }
