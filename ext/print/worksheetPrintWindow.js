@@ -43,6 +43,14 @@ export function openWorksheetPrintWindow(options = {}) {
 
   const { examples, showAnswers, settings } = worksheet;
 
+  // 🐛 ОТЛАДКА - выводим в консоль нового окна
+  printWindow.console.log('🐛 [DEBUG] Worksheet examples count:', examples.length);
+  printWindow.console.log('🐛 [DEBUG] First example:', examples[0]);
+  if (examples[0]) {
+    printWindow.console.log('🐛 [DEBUG] First example steps:', examples[0].steps);
+    printWindow.console.log('🐛 [DEBUG] First step:', examples[0].steps?.[0]);
+  }
+
   // Получаем количество действий из настроек (для совместимости)
   const settingsActionsCount = getActionsCount(settings);
 
@@ -397,6 +405,19 @@ export function openWorksheetPrintWindow(options = {}) {
         for (let col = 0; col < EXAMPLES_PER_TABLE; col++) {
           const ex = pageExamples[col];
           const stepData = ex && ex.steps && ex.steps[row];
+
+          // 🐛 ОТЛАДКА - вывод в консоль окна печати
+          if (row === 0 && col === 0) {
+            console.log('🐛 [DEBUG] First example:', ex);
+            console.log('🐛 [DEBUG] First stepData:', stepData);
+            console.log('🐛 [DEBUG] stepData type:', typeof stepData);
+            if (stepData && typeof stepData === 'object') {
+              console.log('🐛 [DEBUG] stepData.step:', stepData.step);
+              console.log('🐛 [DEBUG] stepData.action:', stepData.action);
+              console.log('🐛 [DEBUG] stepData.isFriend:', stepData.isFriend);
+            }
+          }
+
           // ✅ Используем функцию formatStepForPrint для поддержки Simple, Brothers и Friends
           const step = formatStepForPrint(stepData);
           doc.write(`<td class="examples-table__cell">${escapeHtml(step)}</td>`);
