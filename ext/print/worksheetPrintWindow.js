@@ -593,25 +593,32 @@ function safeNumber(value) {
  * ✅ Fallback для Friends без поля step (обратная совместимость)
  */
 function formatStepForPrint(stepData) {
+  // 🐛 ОТЛАДКА
+  console.log('[formatStepForPrint] stepData:', stepData);
+
   // Пустой шаг
   if (!stepData) return '';
 
   // Simple - строка вида "+3", "-7"
   if (typeof stepData !== 'object') {
+    console.log('[formatStepForPrint] Simple string:', stepData);
     return String(stepData);
   }
 
   // Brothers/Friends - объекты с полем step
   if (stepData.step) {
+    console.log('[formatStepForPrint] Has step field:', stepData.step);
     return stepData.step;
   }
 
   // ✅ FALLBACK для Friends без поля step (старые данные)
   if (stepData.isFriend && stepData.action !== undefined) {
     const sign = stepData.action >= 0 ? '+' : '';
+    console.log('[formatStepForPrint] Fallback for Friends:', `${sign}${stepData.action}`);
     return `${sign}${stepData.action}`;
   }
 
   // Другие случаи - пустая строка
+  console.log('[formatStepForPrint] Empty - no match');
   return '';
 }
