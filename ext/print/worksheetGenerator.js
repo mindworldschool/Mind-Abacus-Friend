@@ -83,6 +83,14 @@ export function generateWorksheet(options = {}) {
     version: 2  // ✅ Версия формата данных (увеличиваем при изменении структуры)
   };
 
+  // 🐛 ОТЛАДКА: выводим первый пример для проверки
+  console.log('🐛 [worksheetGenerator] Создан worksheet version=2');
+  console.log('🐛 [worksheetGenerator] Примеров:', examples.length);
+  if (examples[0]) {
+    console.log('🐛 [worksheetGenerator] Первый пример:', examples[0]);
+    console.log('🐛 [worksheetGenerator] Первый шаг:', examples[0].steps[0]);
+  }
+
   setWorksheet(worksheet);
 
   return worksheet;

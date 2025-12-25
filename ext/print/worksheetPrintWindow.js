@@ -29,10 +29,17 @@ export function openWorksheetPrintWindow(options = {}) {
 
   const worksheet = getCurrentWorksheet();
 
+  console.log('🐛 [DEBUG] Worksheet:', {
+    hasWorksheet: !!worksheet,
+    version: worksheet?.version,
+    examplesCount: worksheet?.examples?.length,
+    firstExample: worksheet?.examples?.[0]
+  });
+
   // ✅ Проверка версии worksheet (инвалидация старого кеша)
   const CURRENT_VERSION = 2;
-  if (worksheet && worksheet.version && worksheet.version < CURRENT_VERSION) {
-    console.warn('[Print] Старая версия worksheet, требуется перегенерация');
+  if (worksheet && (!worksheet.version || worksheet.version < CURRENT_VERSION)) {
+    console.warn('[Print] Старая версия worksheet (version=' + worksheet.version + '), требуется перегенерация');
     alert(t("printSheet.emptyWorksheet") + "\n\nБудь ласка, згенеруйте новий лист для друку.");
     return;
   }
