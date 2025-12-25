@@ -333,6 +333,17 @@ export function openWorksheetPrintWindow(options = {}) {
   // Если действий мало (≤ 10), помещаем 2 таблицы на лист, иначе - по 1 таблице
   const tablesPerPage = actionsCount <= 10 ? 2 : 1;
 
+  // 🐛 ОТЛАДОЧНАЯ ИНФОРМАЦИЯ - будет видна на странице печати
+  doc.write(`
+    <div style="background: yellow; padding: 20px; margin: 20px; border: 3px solid red; font-size: 16px; font-weight: bold;">
+      ⚠️ DEBUG INFO (версия кода обновлена ${new Date().toISOString()}):
+      <br>• Примеров: ${examples.length}
+      <br>• Первый пример имеет ${examples[0]?.steps?.length || 0} шагов
+      <br>• Первый шаг: ${JSON.stringify(examples[0]?.steps?.[0])}
+      <br>• Версия worksheet: ${worksheet.version || 'НЕТ'}
+    </div>
+  `);
+
   // Группируем таблицы по страницам
   for (let groupIndex = 0; groupIndex < worksheetPages.length; groupIndex += tablesPerPage) {
     const isFirstGroup = groupIndex === 0;
