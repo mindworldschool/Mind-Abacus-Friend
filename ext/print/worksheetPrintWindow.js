@@ -27,6 +27,9 @@ const EXAMPLES_PER_TABLE = 5; // 5 примеров на таблицу
 export function openWorksheetPrintWindow(options = {}) {
   const { autoPrint = true } = options;
 
+  // 🐛 ПРОВЕРКА ЧТО КОД ОБНОВИЛСЯ
+  alert('КОД ОБНОВЛЕН! Версия: ' + new Date().toISOString());
+
   const worksheet = getCurrentWorksheet();
 
   if (!worksheet || !Array.isArray(worksheet.examples) || worksheet.examples.length === 0) {
