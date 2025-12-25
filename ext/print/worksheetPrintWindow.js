@@ -408,20 +408,18 @@ export function openWorksheetPrintWindow(options = {}) {
           const ex = pageExamples[col];
           const stepData = ex && ex.steps && ex.steps[row];
 
-          // 🐛 ОТЛАДКА первой ячейки
-          if (row === 0 && col === 0) {
-            console.log('🐛 [formatStepForPrint] Первая ячейка:', {
-              hasExample: !!ex,
-              hasSteps: !!ex?.steps,
-              stepData: stepData,
-              stepDataType: typeof stepData,
-              stepField: typeof stepData === 'object' ? stepData?.step : 'N/A'
-            });
-          }
-
           // ✅ Используем функцию formatStepForPrint для поддержки Simple, Brothers и Friends
           const step = formatStepForPrint(stepData);
-          doc.write(`<td class="examples-table__cell">${escapeHtml(step)}</td>`);
+
+          // 🐛 ВРЕМЕННАЯ ОТЛАДКА: показываем тип данных прямо в ячейке
+          let debugInfo = '';
+          if (row === 0 && col === 0) {
+            const type = typeof stepData;
+            const hasStep = stepData && typeof stepData === 'object' ? stepData.step : 'no';
+            debugInfo = `<br><small style="color:red;">type:${type} step:${hasStep}</small>`;
+          }
+
+          doc.write(`<td class="examples-table__cell">${escapeHtml(step)}${debugInfo}</td>`);
         }
 
         doc.write(`</tr>`);
