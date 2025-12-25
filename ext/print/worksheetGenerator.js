@@ -6,6 +6,7 @@
 
 import { getState, setWorksheet } from "../../core/state.js";
 import { generateExample } from "../core/generator.js";
+import { buildGeneratorSettingsFromSettings } from "../core/buildGeneratorSettings.js";
 
 /**
  * @typedef {Object} WorksheetExample
@@ -35,10 +36,6 @@ import { generateExample } from "../core/generator.js";
 export function generateWorksheet(options = {}) {
   const { examplesCount = 20, showAnswers = false } = options;
 
-  // 🆕 Логирование для отладки
-  console.log("[worksheetGenerator] Received options:", options);
-  console.log("[worksheetGenerator] showAnswers value:", showAnswers);
-
   const fullState = getState();
   const trainerSettings = fullState.settings;
 
@@ -50,9 +47,12 @@ export function generateWorksheet(options = {}) {
   /** @type {WorksheetExample[]} */
   const examples = [];
 
+  // ✅ Используем ту же функцию преобразования настроек, что и тренажер
+  const generatorSettings = buildGeneratorSettingsFromSettings(trainerSettings);
+
   // Добавляем флаг silent для подавления логов при генерации печати
   const settingsForPrint = {
-    ...trainerSettings,
+    ...generatorSettings,
     silent: true
   };
 
