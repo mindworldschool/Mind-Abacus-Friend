@@ -36,10 +36,6 @@ import { buildGeneratorSettingsFromSettings } from "../core/buildGeneratorSettin
 export function generateWorksheet(options = {}) {
   const { examplesCount = 20, showAnswers = false } = options;
 
-  // 🆕 Логирование для отладки
-  console.log("[worksheetGenerator] Received options:", options);
-  console.log("[worksheetGenerator] showAnswers value:", showAnswers);
-
   const fullState = getState();
   const trainerSettings = fullState.settings;
 
@@ -61,17 +57,7 @@ export function generateWorksheet(options = {}) {
   };
 
   for (let i = 0; i < examplesCount; i++) {
-    // 🐛 ОТЛАДКА: логируем настройки для генерации
-    if (i === 0) {
-      console.log("[worksheetGenerator] Settings для generateExample:", JSON.stringify(settingsForPrint, null, 2));
-    }
-
     const ex = generateExample(settingsForPrint);
-
-    // 🐛 ОТЛАДКА: логируем результат
-    if (i === 0) {
-      console.log("[worksheetGenerator] Результат generateExample:", ex);
-    }
 
     if (!ex) {
       console.warn("[worksheet] generateExample вернул пустой результат, пропуск:", i);

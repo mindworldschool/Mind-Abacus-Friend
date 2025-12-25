@@ -27,9 +27,6 @@ const EXAMPLES_PER_TABLE = 5; // 5 примеров на таблицу
 export function openWorksheetPrintWindow(options = {}) {
   const { autoPrint = true } = options;
 
-  // 🐛 ПРОВЕРКА ЧТО КОД ОБНОВИЛСЯ
-  alert('КОД ОБНОВЛЕН! Версия: ' + new Date().toISOString());
-
   const worksheet = getCurrentWorksheet();
 
   if (!worksheet || !Array.isArray(worksheet.examples) || worksheet.examples.length === 0) {
@@ -325,13 +322,6 @@ export function openWorksheetPrintWindow(options = {}) {
   // Определяем, сколько таблиц можно разместить на одном листе
   // Если действий мало (≤ 10), помещаем 2 таблицы на лист, иначе - по 1 таблице
   const tablesPerPage = actionsCount <= 10 ? 2 : 1;
-
-  // 🐛 ОТЛАДКА: показываем данные прямо на странице
-  doc.write(`<div style="background:#ffeb3b;padding:10px;margin:10px;border:2px solid #f44336;font-family:monospace;font-size:12px;">`);
-  doc.write(`<b>ОТЛАДКА:</b><br>`);
-  doc.write(`Примеров: ${examples.length}<br>`);
-  doc.write(`Первый пример: ${JSON.stringify(examples[0])}<br>`);
-  doc.write(`</div>`);
 
   // Группируем таблицы по страницам
   for (let groupIndex = 0; groupIndex < worksheetPages.length; groupIndex += tablesPerPage) {
