@@ -29,6 +29,14 @@ export function openWorksheetPrintWindow(options = {}) {
 
   const worksheet = getCurrentWorksheet();
 
+  // ✅ Проверка версии worksheet (инвалидация старого кеша)
+  const CURRENT_VERSION = 2;
+  if (worksheet && worksheet.version && worksheet.version < CURRENT_VERSION) {
+    console.warn('[Print] Старая версия worksheet, требуется перегенерация');
+    alert(t("printSheet.emptyWorksheet") + "\n\nБудь ласка, згенеруйте новий лист для друку.");
+    return;
+  }
+
   if (!worksheet || !Array.isArray(worksheet.examples) || worksheet.examples.length === 0) {
     alert(t("printSheet.emptyWorksheet"));
     return;

@@ -79,7 +79,8 @@ export function generateWorksheet(options = {}) {
     examples,
     settings: trainerSettings, // Передаем полные настройки для доступа к actions.count
     createdAt: new Date().toISOString(),
-    showAnswers: Boolean(showAnswers)
+    showAnswers: Boolean(showAnswers),
+    version: 2  // ✅ Версия формата данных (увеличиваем при изменении структуры)
   };
 
   setWorksheet(worksheet);
