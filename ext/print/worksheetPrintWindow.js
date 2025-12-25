@@ -27,22 +27,12 @@ const EXAMPLES_PER_TABLE = 5; // 5 примеров на таблицу
 export function openWorksheetPrintWindow(options = {}) {
   const { autoPrint = true } = options;
 
-  // ✅ ВСЕГДА генерируем свежий worksheet для печати
-  // Это гарантирует что используются актуальные данные
-  console.log('[Print] Генерация свежего worksheet для печати...');
-
   const worksheet = getCurrentWorksheet();
 
   if (!worksheet || !Array.isArray(worksheet.examples) || worksheet.examples.length === 0) {
     alert(t("printSheet.emptyWorksheet"));
     return;
   }
-
-  console.log('[Print] Worksheet загружен:', {
-    version: worksheet.version,
-    examplesCount: worksheet.examples.length,
-    firstExampleSteps: worksheet.examples[0]?.steps?.length
-  });
 
   const printWindow = window.open("", "_blank");
 
@@ -333,17 +323,6 @@ export function openWorksheetPrintWindow(options = {}) {
   // Если действий мало (≤ 10), помещаем 2 таблицы на лист, иначе - по 1 таблице
   const tablesPerPage = actionsCount <= 10 ? 2 : 1;
 
-  // 🐛 ОТЛАДОЧНАЯ ИНФОРМАЦИЯ - будет видна на странице печати
-  doc.write(`
-    <div style="background: yellow; padding: 20px; margin: 20px; border: 3px solid red; font-size: 16px; font-weight: bold;">
-      ⚠️ DEBUG INFO (версия кода обновлена ${new Date().toISOString()}):
-      <br>• Примеров: ${examples.length}
-      <br>• Первый пример имеет ${examples[0]?.steps?.length || 0} шагов
-      <br>• Первый шаг: ${JSON.stringify(examples[0]?.steps?.[0])}
-      <br>• Версия worksheet: ${worksheet.version || 'НЕТ'}
-    </div>
-  `);
-
   // Группируем таблицы по страницам
   for (let groupIndex = 0; groupIndex < worksheetPages.length; groupIndex += tablesPerPage) {
     const isFirstGroup = groupIndex === 0;
@@ -418,19 +397,9 @@ export function openWorksheetPrintWindow(options = {}) {
         for (let col = 0; col < EXAMPLES_PER_TABLE; col++) {
           const ex = pageExamples[col];
           const stepData = ex && ex.steps && ex.steps[row];
-
           // ✅ Используем функцию formatStepForPrint для поддержки Simple, Brothers и Friends
           const step = formatStepForPrint(stepData);
-
-          // 🐛 ВРЕМЕННАЯ ОТЛАДКА: показываем тип данных прямо в ячейке
-          let debugInfo = '';
-          if (row === 0 && col === 0) {
-            const type = typeof stepData;
-            const hasStep = stepData && typeof stepData === 'object' ? stepData.step : 'no';
-            debugInfo = `<br><small style="color:red;">type:${type} step:${hasStep}</small>`;
-          }
-
-          doc.write(`<td class="examples-table__cell">${escapeHtml(step)}${debugInfo}</td>`);
+          doc.write(`<td class="examples-table__cell">${escapeHtml(step)}</td>`);
         }
 
         doc.write(`</tr>`);
