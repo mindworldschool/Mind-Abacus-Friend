@@ -27,27 +27,22 @@ const EXAMPLES_PER_TABLE = 5; // 5 примеров на таблицу
 export function openWorksheetPrintWindow(options = {}) {
   const { autoPrint = true } = options;
 
+  // ✅ ВСЕГДА генерируем свежий worksheet для печати
+  // Это гарантирует что используются актуальные данные
+  console.log('[Print] Генерация свежего worksheet для печати...');
+
   const worksheet = getCurrentWorksheet();
-
-  console.log('🐛 [DEBUG] Worksheet:', {
-    hasWorksheet: !!worksheet,
-    version: worksheet?.version,
-    examplesCount: worksheet?.examples?.length,
-    firstExample: worksheet?.examples?.[0]
-  });
-
-  // ✅ Проверка версии worksheet (инвалидация старого кеша)
-  const CURRENT_VERSION = 2;
-  if (worksheet && (!worksheet.version || worksheet.version < CURRENT_VERSION)) {
-    console.warn('[Print] Старая версия worksheet (version=' + worksheet.version + '), требуется перегенерация');
-    alert(t("printSheet.emptyWorksheet") + "\n\nБудь ласка, згенеруйте новий лист для друку.");
-    return;
-  }
 
   if (!worksheet || !Array.isArray(worksheet.examples) || worksheet.examples.length === 0) {
     alert(t("printSheet.emptyWorksheet"));
     return;
   }
+
+  console.log('[Print] Worksheet загружен:', {
+    version: worksheet.version,
+    examplesCount: worksheet.examples.length,
+    firstExampleSteps: worksheet.examples[0]?.steps?.length
+  });
 
   const printWindow = window.open("", "_blank");
 
@@ -412,6 +407,18 @@ export function openWorksheetPrintWindow(options = {}) {
         for (let col = 0; col < EXAMPLES_PER_TABLE; col++) {
           const ex = pageExamples[col];
           const stepData = ex && ex.steps && ex.steps[row];
+
+          // 🐛 ОТЛАДКА первой ячейки
+          if (row === 0 && col === 0) {
+            console.log('🐛 [formatStepForPrint] Первая ячейка:', {
+              hasExample: !!ex,
+              hasSteps: !!ex?.steps,
+              stepData: stepData,
+              stepDataType: typeof stepData,
+              stepField: typeof stepData === 'object' ? stepData?.step : 'N/A'
+            });
+          }
+
           // ✅ Используем функцию formatStepForPrint для поддержки Simple, Brothers и Friends
           const step = formatStepForPrint(stepData);
           doc.write(`<td class="examples-table__cell">${escapeHtml(step)}</td>`);
